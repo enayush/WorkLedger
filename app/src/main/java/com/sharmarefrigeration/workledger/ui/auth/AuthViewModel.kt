@@ -3,7 +3,6 @@ package com.sharmarefrigeration.workledger.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sharmarefrigeration.workledger.data.UserRepository
-import com.sharmarefrigeration.workledger.model.UserRole
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
