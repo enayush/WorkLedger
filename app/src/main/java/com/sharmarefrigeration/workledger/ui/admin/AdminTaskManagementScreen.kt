@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.Task
 import com.sharmarefrigeration.workledger.ui.components.SwipeRefreshBox
 
@@ -26,9 +28,9 @@ fun AdminTaskManagementScreen(
     viewModel: AdminViewModel,
     onBack: () -> Unit
 ) {
-    val unassignedTasks by viewModel.manageUnassignedTasks.collectAsState()
-    val assignedTasks by viewModel.manageAssignedTasks.collectAsState()
-    val isLoading by viewModel.isManageTasksLoading.collectAsState()
+    val unassignedTasks by viewModel.manageUnassignedTasks.collectAsStateWithLifecycle()
+    val assignedTasks by viewModel.manageAssignedTasks.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isManageTasksLoading.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var isSwipeRefreshing by remember { mutableStateOf(false) }

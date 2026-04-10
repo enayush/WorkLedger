@@ -10,10 +10,10 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -41,7 +41,7 @@ fun AppShell(
     val currentRoute = navBackStackEntry?.destination?.route
     val context = LocalContext.current
 
-    val isEmployeeLoading by employeeViewModel.isLoading.collectAsState()
+    val isEmployeeLoading by employeeViewModel.isLoading.collectAsStateWithLifecycle()
 
     // Determine the start destination based on role
     val startDest = when (currentUser.role) {
@@ -285,7 +285,7 @@ fun AppShell(
             composable("dashboard") {
                 EmployeeScreen(
                     viewModel = employeeViewModel,
-                    onLogNewWorkClick = { taskId ->
+                    onNavigateToLogWork = { taskId ->
                         if (taskId != null) navController.navigate("log_work?taskId=$taskId")
                         else navController.navigate("log_work") // Ad-hoc route
                     }
@@ -293,8 +293,8 @@ fun AppShell(
             }
             composable(
                 route = "log_work?taskId={taskId}",
-                arguments = listOf(androidx.navigation.navArgument("taskId") {
-                    type = androidx.navigation.NavType.StringType
+                arguments = listOf(navArgument("taskId") {
+                    type = NavType.StringType
                     nullable = true
                 })
             ) { backStackEntry ->

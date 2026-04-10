@@ -18,16 +18,36 @@ class EmployeeViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
 
     // Dashboard State
-    val assignedTasks: StateFlow<List<Task>> = (auth.currentUser?.uid?.let { uid ->
-        taskRepository.listenToAssignedTasksForEmployee(uid)
-    } ?: emptyFlow()).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val submittedTasks: StateFlow<List<Task>> = (auth.currentUser?.uid?.let { uid ->
-        taskRepository.listenToRecentSubmittedTasks(uid)
-    } ?: emptyFlow()).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
+    private val uid = auth.currentUser?.uid
+    // Loading state
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    // Replacing manual collect with stateIn
+    val assignedTasks: StateFlow<List<Task>> = if (uid != null) {
+        taskRepository.listenToAssignedTasksForEmployee(uid)
+            .onStart { _isLoading.value = true }
+            .onEach { _isLoading.value = false }
+            .catch { e ->
+                _isLoading.value = false
+                e.printStackTrace()
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+    } else MutableStateFlow(emptyList())
+
+    val submittedTasks: StateFlow<List<Task>> = if (uid != null) {
+        taskRepository.listenToRecentSubmittedTasks(uid)
+            .catch { it.printStackTrace() }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+    } else MutableStateFlow(emptyList())
 
     // History Pagination State
     private val _historyTasks = MutableStateFlow<List<Task>>(emptyList())

@@ -18,14 +18,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.Invoice
 import com.sharmarefrigeration.workledger.model.InvoiceStatus
 import com.sharmarefrigeration.workledger.model.PaymentMethod
+import kotlin.let
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminApprovalsScreen(viewModel: AdminViewModel) {
-    val pendingInvoices by viewModel.pendingInvoices.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val pendingInvoices by viewModel.pendingInvoices.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var selectedInvoice by remember { mutableStateOf<Invoice?>(null) }

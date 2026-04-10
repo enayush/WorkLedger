@@ -15,13 +15,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.Task
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateBillScreen(viewModel: AccountantViewModel) {
-    val pendingTasks by viewModel.tasksNeedingBills.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val pendingTasks by viewModel.tasksNeedingBills.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var taskToProcess by remember { mutableStateOf<Task?>(null) }
 
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {

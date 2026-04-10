@@ -15,13 +15,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.Invoice
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DistributeBillScreen(viewModel: AccountantViewModel) {
-    val invoices by viewModel.invoicesToDistribute.collectAsState()
+    val invoices by viewModel.invoicesToDistribute.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val dateFormatter = remember { SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()) }
 
     var showDialog by remember { mutableStateOf<Invoice?>(null) }

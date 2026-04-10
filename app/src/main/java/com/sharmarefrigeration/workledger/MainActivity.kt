@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,40 +52,37 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                val authState by authViewModel.authState.collectAsState()
+                val authState by authViewModel.authState.collectAsStateWithLifecycle()
 
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-
-                    when (val state = authState) {
-                        is com.sharmarefrigeration.workledger.ui.auth.AuthState.InitialChecking -> {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Text("loading...", color = MaterialTheme.colorScheme.onBackground)
-                                }
+                when (val state = authState) {
+                    is com.sharmarefrigeration.workledger.ui.auth.AuthState.InitialChecking -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text("loading...", color = MaterialTheme.colorScheme.onBackground)
                             }
                         }
-                        is com.sharmarefrigeration.workledger.ui.auth.AuthState.Authenticated -> {
-                            // User is logged in! Pass their data into the Shell.
-                            val currentUser = state.user
+                    }
+                    is com.sharmarefrigeration.workledger.ui.auth.AuthState.Authenticated -> {
+                        // User is logged in! Pass their data into the Shell.
+                        val currentUser = state.user
 
-                            com.sharmarefrigeration.workledger.ui.AppShell(
-                                currentUser = currentUser,
-                                employeeViewModel = employeeViewModel,
-                                accountantViewModel = accountantViewModel,
-                                adminViewModel = adminViewModel,
-                                onLogout = {
-                                    auth.signOut() // Log out of Firebase
-                                    authViewModel.clearCache() // clear saved preferences
-                                    authViewModel.setIdle() // Reset viewmodel
-                                }
-                            )
-                        }
-                        else -> {
-                            // User is NOT logged in. Show the new Username/Password Screen.
-                            LoginScreen(viewModel = authViewModel)
-                        }
+                        com.sharmarefrigeration.workledger.ui.AppShell(
+                            currentUser = currentUser,
+                            employeeViewModel = employeeViewModel,
+                            accountantViewModel = accountantViewModel,
+                            adminViewModel = adminViewModel,
+                            onLogout = {
+                                auth.signOut() // Log out of Firebase
+                                authViewModel.clearCache() // clear saved preferences
+                                authViewModel.setIdle() // Reset viewmodel
+                            }
+                        )
+                    }
+                    else -> {
+                        // User is NOT logged in. Show the new Username/Password Screen.
+                        LoginScreen(viewModel = authViewModel)
                     }
                 }
             }

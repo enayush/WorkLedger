@@ -17,17 +17,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.User
 
 @Composable
 fun AdminDirectoryScreen(
     viewModel: AdminViewModel,
-    onTechnicianClick: (String) -> Unit, // For field techs
-    onAccountantClick: (String) -> Unit  // For accountants
+    onTechnicianClick: (String) -> Unit,
+    onAccountantClick: (String) -> Unit
 ) {
-    val technicians by viewModel.technicians.collectAsState()
-    val accountants by viewModel.accountants.collectAsState()
-    val context = LocalContext.current
+    val technicians by viewModel.technicians.collectAsStateWithLifecycle()
+    val accountants by viewModel.accountants.collectAsStateWithLifecycle()
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),

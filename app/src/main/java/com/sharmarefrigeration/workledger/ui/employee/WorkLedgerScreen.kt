@@ -16,6 +16,7 @@ import android.widget.Toast
 import com.sharmarefrigeration.workledger.ui.components.SubmittedTaskCard
 import com.sharmarefrigeration.workledger.model.Task
 import com.sharmarefrigeration.workledger.ui.components.SwipeRefreshBox
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,9 +25,9 @@ fun WorkLedgerScreen(
     targetUserId: String? = null,
     onBack: () -> Unit
 ) {
-    val historyTasks by viewModel.historyTasks.collectAsState()
-    val isLoading by viewModel.isHistoryLoading.collectAsState()
-    val isLastHistoryPage by viewModel.isLastHistoryPage.collectAsState()
+    val historyTasks by viewModel.historyTasks.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isHistoryLoading.collectAsStateWithLifecycle()
+    val isLastHistoryPage by viewModel.isLastHistoryPage.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var isSwipeRefreshing by remember { mutableStateOf(false) }

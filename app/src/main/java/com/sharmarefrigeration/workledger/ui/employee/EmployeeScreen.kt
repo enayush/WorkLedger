@@ -18,16 +18,20 @@ import androidx.compose.ui.unit.dp
 import com.sharmarefrigeration.workledger.model.Task
 import com.sharmarefrigeration.workledger.model.TaskType
 import com.sharmarefrigeration.workledger.ui.components.SubmittedTaskCard
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmployeeScreen(
     viewModel: EmployeeViewModel,
-    onLogNewWorkClick: (String?) -> Unit
+//    employeeName: String,
+    onNavigateToLogWork: (taskId: String?) -> Unit,
+//    onNavigateToWorkLedger: () -> Unit,
+//    onLogout: () -> Unit
 ) {
-    val assignedTasks by viewModel.assignedTasks.collectAsState()
-    val submittedTasks by viewModel.submittedTasks.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val assignedTasks by viewModel.assignedTasks.collectAsStateWithLifecycle()
+    val submittedTasks by viewModel.submittedTasks.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     // State to handle viewing a submitted task details
     var taskToView by remember { mutableStateOf<Task?>(null) }
@@ -35,7 +39,7 @@ fun EmployeeScreen(
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
-                onClick ={ onLogNewWorkClick(null) },
+                onClick ={ onNavigateToLogWork(null) },
                 containerColor = MaterialTheme.colorScheme.primary
             ){
                 Icon(Icons.Default.Add, contentDescription = "Log Ad-Hoc Work")
@@ -69,7 +73,7 @@ fun EmployeeScreen(
                         }
                     } else {
                         items(assignedTasks, key = { it.id }) { task ->
-                            AssignedTaskCard(task = task, onCompleteClick = { onLogNewWorkClick(task.id) })
+                            AssignedTaskCard(task = task, onCompleteClick = { onNavigateToLogWork(task.id) })
                         }
                     }
 

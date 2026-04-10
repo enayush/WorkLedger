@@ -11,9 +11,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sharmarefrigeration.workledger.model.Invoice
+import com.sharmarefrigeration.workledger.model.InvoiceStatus
 import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import com.sharmarefrigeration.workledger.ui.components.RecentInvoiceCard
 import com.sharmarefrigeration.workledger.ui.components.SwipeRefreshBox
 
@@ -24,9 +29,9 @@ fun BillingArchiveScreen(
     targetUserId: String? = null,
     onBack: () -> Unit
 ) {
-    val historyInvoices by viewModel.historyInvoices.collectAsState()
-    val isLoading by viewModel.isHistoryLoading.collectAsState()
-    val isLastHistoryPage = viewModel.isLastHistoryPage.collectAsState().value
+    val historyInvoices by viewModel.historyInvoices.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isHistoryLoading.collectAsStateWithLifecycle()
+    val isLastHistoryPage = viewModel.isLastHistoryPage.collectAsStateWithLifecycle().value
     val context = LocalContext.current
 
     var isSwipeRefreshing by remember { mutableStateOf(false) }
@@ -142,7 +147,7 @@ fun BillingArchiveScreen(
                                 Text(
                                     text = "End of history",
                                     modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    textAlign = TextAlign.Center,
                                     style = MaterialTheme.typography.labelSmall
                                 )
                             }

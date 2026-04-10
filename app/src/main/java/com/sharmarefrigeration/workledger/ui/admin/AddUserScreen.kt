@@ -18,20 +18,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.sharmarefrigeration.workledger.model.UserRole
+import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.text.style.TextAlign
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddUserScreen(
-    viewModel: AdminViewModel,
-    onBack: () -> Unit
-) {
+fun AddUserScreen(viewModel: AdminViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
-    val isLoading by viewModel.isLoading.collectAsState()
     val scrollState = rememberScrollState()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }

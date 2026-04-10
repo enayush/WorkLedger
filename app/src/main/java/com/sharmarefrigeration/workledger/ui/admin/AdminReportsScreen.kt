@@ -14,7 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.text.SimpleDateFormat
 import java.util.Locale
 import com.sharmarefrigeration.workledger.ui.components.RecentInvoiceCard
@@ -25,13 +28,10 @@ enum class ReportMode { TASKS, INVOICES }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AdminReportsScreen(
-    viewModel: AdminViewModel,
-    onBack: () -> Unit
-) {
-    val reportTasks by viewModel.reportTasks.collectAsState()
-    val reportInvoices by viewModel.reportInvoices.collectAsState()
-    val isLoading by viewModel.isReportLoading.collectAsState()
+fun AdminReportsScreen(viewModel: AdminViewModel, onBack: () -> Unit) {
+    val reportTasks by viewModel.reportTasks.collectAsStateWithLifecycle()
+    val reportInvoices by viewModel.reportInvoices.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isReportLoading.collectAsStateWithLifecycle()
 
     var currentMode by remember { mutableStateOf(ReportMode.TASKS) }
     var showDatePicker by remember { mutableStateOf(false) }

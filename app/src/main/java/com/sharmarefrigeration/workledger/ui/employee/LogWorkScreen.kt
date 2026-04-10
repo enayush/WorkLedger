@@ -22,6 +22,7 @@ import java.util.Locale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.ui.draw.scale
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun LogWorkScreen(
@@ -48,7 +49,9 @@ fun LogWorkScreen(
     var isSubmitting by remember { mutableStateOf(false) }
     var isSuccess by remember { mutableStateOf(false) }
 
-    val isLoading by viewModel.isLoading.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+
+    var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(taskIdToComplete) {
         if (taskIdToComplete != null) {

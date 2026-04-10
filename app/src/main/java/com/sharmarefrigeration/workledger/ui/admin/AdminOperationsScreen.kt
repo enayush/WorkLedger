@@ -15,6 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.Task
 import com.sharmarefrigeration.workledger.model.User
 import java.text.SimpleDateFormat
@@ -24,9 +27,10 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminOperationsScreen(viewModel: AdminViewModel) {
-    val unassignedTasks by viewModel.unassignedTasks.collectAsState()
-    val assignedTasks by viewModel.assignedTasks.collectAsState()
-    val employees by viewModel.technicians.collectAsState()
+    val unassignedTasks by viewModel.unassignedTasks.collectAsStateWithLifecycle()
+    val assignedTasks by viewModel.assignedTasks.collectAsStateWithLifecycle()
+    val employees by viewModel.technicians.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     var showCreateTaskDialog by remember { mutableStateOf(false) }
     var taskToAssign by remember { mutableStateOf<Task?>(null) }
