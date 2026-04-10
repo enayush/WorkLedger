@@ -24,19 +24,20 @@ class AdminViewModel : ViewModel() {
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     // --- PIPELINE 1: OPERATIONS (Tasks) ---
-    private val _activeTasks = MutableStateFlow<List<Task>>(emptyList())
+    private val activeTasks: StateFlow<List<Task>> = taskRepository.listenToActiveTasksForAdmin()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val unassignedTasks: StateFlow<List<Task>> = _activeTasks.map { list ->
+    val unassignedTasks: StateFlow<List<Task>> = activeTasks.map { list ->
         list.filter { it.status == TaskStatus.UNASSIGNED }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val assignedTasks: StateFlow<List<Task>> = _activeTasks.map { list ->
+    val assignedTasks: StateFlow<List<Task>> = activeTasks.map { list ->
         list.filter { it.status == TaskStatus.ASSIGNED  }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- PIPELINE 2: APPROVALS (Invoices) ---
-    private val _pendingInvoices = MutableStateFlow<List<Invoice>>(emptyList())
-    val pendingInvoices: StateFlow<List<Invoice>> = _pendingInvoices.asStateFlow()
+    val pendingInvoices: StateFlow<List<Invoice>> = invoiceRepository.listenToPendingInvoices()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _technicians = MutableStateFlow<List<User>>(emptyList())
     val technicians: StateFlow<List<User>> = _technicians.asStateFlow()
@@ -46,7 +47,6 @@ class AdminViewModel : ViewModel() {
 
     init {
         fetchTeam()
-        listenToPipes()
     }
 
     private fun fetchTeam() {
@@ -56,14 +56,6 @@ class AdminViewModel : ViewModel() {
         }
     }
 
-    private fun listenToPipes() {
-        viewModelScope.launch {
-            // Pipe 1: Operations
-            launch { taskRepository.listenToActiveTasksForAdmin().collect { _activeTasks.value = it } }
-            // Pipe 2: Approvals (Assuming your repo listens to PAYMENT_RECEIVED)
-            launch { invoiceRepository.listenToPendingInvoices().collect { _pendingInvoices.value = it } }
-        }
-    }
 
     fun createNewTask(
         companyName: String,
@@ -111,11 +103,9 @@ class AdminViewModel : ViewModel() {
     fun approveInvoice(invoice: Invoice, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
-            if (invoiceRepository.markInvoiceApproved(invoice.id)) {
-                if (taskRepository.updateTaskStatus(invoice.taskId, TaskStatus.CLOSED)) {
-                    onSuccess()
-                } else onError("Invoice approved, but task didn't close.")
-            } else onError("Failed to approve invoice.")
+            if (invoiceRepository.markInvoiceApprovedAndUpdateTask(invoice.id, invoice.taskId)) {
+                onSuccess()
+            } else onError("Failed to approve invoice and update task.")
             _isLoading.value = false
         }
     }
@@ -130,13 +120,10 @@ class AdminViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
 
-            // 1. Force the Invoice Closed
-            if (invoiceRepository.adminForceApprovePayment(invoice.id, method, notes)) {
-                // 2. Close the original Task
-                if (taskRepository.updateTaskStatus(invoice.taskId, com.sharmarefrigeration.workledger.model.TaskStatus.CLOSED)) {
-                    onSuccess()
-                } else onError("Invoice bypassed, but task didn't close.")
-            } else onError("Failed to force approve invoice.")
+            // 1. Force the Invoice Closed && 2. Close the original Task atomically
+            if (invoiceRepository.adminForceApprovePaymentAndUpdateTask(invoice.id, invoice.taskId, method, notes)) {
+                onSuccess()
+            } else onError("Failed to force approve invoice and close task.")
 
             _isLoading.value = false
         }
@@ -156,8 +143,7 @@ class AdminViewModel : ViewModel() {
         val fakeEmail = "$cleanUsername@sharma.local"
 
         // Generate a random 6-character alphanumeric password
-        val generatedPassword = List(6) { (('a'..'z') + ('A'..'Z') + ('2'..'9')).random() }.joinToString("")
-
+        val generatedPassword = List(8) { (('a'..'z') + ('A'..'Z') + ('2'..'9')).random() }.joinToString("")
         viewModelScope.launch {
             _isLoading.value = true
 
@@ -265,10 +251,17 @@ class AdminViewModel : ViewModel() {
     fun searchTasksByDateRange(startMillis: Long, endMillis: Long) {
         viewModelScope.launch {
             _isReportLoading.value = true
-            // Convert milliseconds from the date picker to Java Dates
-            val startDate = java.util.Date(startMillis)
-            // Add 24 hours to the end date to include the entire final day
-            val endDate = java.util.Date(endMillis + 86400000)
+            val startDate = Date(startMillis)
+
+            // Safely set to the end of the selected day
+            val calendar = java.util.Calendar.getInstance().apply {
+                timeInMillis = endMillis
+                set(java.util.Calendar.HOUR_OF_DAY, 23)
+                set(java.util.Calendar.MINUTE, 59)
+                set(java.util.Calendar.SECOND, 59)
+                set(java.util.Calendar.MILLISECOND, 999)
+            }
+            val endDate = calendar.time
 
             _reportTasks.value = taskRepository.getTasksByDateRange(startDate, endDate)
             _isReportLoading.value = false
@@ -278,8 +271,17 @@ class AdminViewModel : ViewModel() {
     fun searchInvoicesByDateRange(startMillis: Long, endMillis: Long) {
         viewModelScope.launch {
             _isReportLoading.value = true
-            val startDate = java.util.Date(startMillis)
-            val endDate = java.util.Date(endMillis + 86400000)
+            val startDate = Date(startMillis)
+
+            // Safely set to the end of the selected day
+            val calendar = java.util.Calendar.getInstance().apply {
+                timeInMillis = endMillis
+                set(java.util.Calendar.HOUR_OF_DAY, 23)
+                set(java.util.Calendar.MINUTE, 59)
+                set(java.util.Calendar.SECOND, 59)
+                set(java.util.Calendar.MILLISECOND, 999)
+            }
+            val endDate = calendar.time
 
             _reportInvoices.value = invoiceRepository.getInvoicesByDateRange(startDate, endDate)
             _isReportLoading.value = false

@@ -29,28 +29,20 @@ class AccountantViewModel : ViewModel() {
     val isLastHistoryPage: StateFlow<Boolean> = _isLastHistoryPage.asStateFlow()
 
     // PIPELINE BUCKETS
-    private val _tasksNeedingBills = MutableStateFlow<List<Task>>(emptyList())
-    val tasksNeedingBills: StateFlow<List<Task>> = _tasksNeedingBills.asStateFlow()
+    val tasksNeedingBills: StateFlow<List<Task>> = taskRepository.listenToPendingBillingTasks()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _activeInvoices = MutableStateFlow<List<Invoice>>(emptyList())
+    private val activeInvoices: StateFlow<List<Invoice>> = (auth.currentUser?.uid?.let { uid ->
+        invoiceRepository.listenToRecentInvoices(uid)
+    } ?: emptyFlow()).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val invoicesToDistribute: StateFlow<List<Invoice>> = _activeInvoices.map { list ->
+    val invoicesToDistribute: StateFlow<List<Invoice>> = activeInvoices.map { list ->
         list.filter { it.status == InvoiceStatus.CREATED }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val invoicesToCollect: StateFlow<List<Invoice>> = _activeInvoices.map { list ->
+    val invoicesToCollect: StateFlow<List<Invoice>> = activeInvoices.map { list ->
         list.filter { it.status == InvoiceStatus.DISTRIBUTED }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-    init { listenToPipeline() }
-
-    private fun listenToPipeline() {
-        val uid = auth.currentUser?.uid ?: return
-        viewModelScope.launch {
-            launch { taskRepository.listenToPendingBillingTasks().collect { _tasksNeedingBills.value = it } }
-            launch { invoiceRepository.listenToRecentInvoices(uid).collect { _activeInvoices.value = it } }
-        }
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun generateBill(task: Task, amount: Double, notes: String, onSuccess: () -> Unit) {
         val uid = auth.currentUser?.uid ?: return
@@ -69,8 +61,7 @@ class AccountantViewModel : ViewModel() {
                 employeeName = task.employeeName
             )
 
-            if (invoiceRepository.createInvoice(newInvoice)) {
-                taskRepository.updateTaskStatus(task.id, TaskStatus.PENDING_APPROVAL)
+            if (invoiceRepository.createInvoiceAndUpdateTask(newInvoice, TaskStatus.PENDING_APPROVAL)) {
                 onSuccess()
             }
             _isLoading.value = false

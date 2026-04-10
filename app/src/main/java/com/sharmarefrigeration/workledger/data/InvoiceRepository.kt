@@ -7,6 +7,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Query
 import com.sharmarefrigeration.workledger.model.InvoiceStatus
 import com.sharmarefrigeration.workledger.model.PaymentMethod
+import com.sharmarefrigeration.workledger.model.TaskStatus
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -16,13 +17,22 @@ class InvoiceRepository {
     private val db = FirebaseFirestore.getInstance()
     private val invoiceCollection = db.collection("Invoices")
 
-    suspend fun createInvoice(invoice: Invoice): Boolean {
+    suspend fun createInvoiceAndUpdateTask(invoice: Invoice, newStatus: TaskStatus): Boolean {
         return try {
-            // Generate a new ID for the invoice
-            val docRef = invoiceCollection.document()
-            val invoiceToSave = invoice.copy(id = docRef.id)
+            val batch = db.batch()
 
-            docRef.set(invoiceToSave).await()
+            // 1. Create the Invoice
+            val invoiceRef = invoiceCollection.document()
+            val invoiceToSave = invoice.copy(id = invoiceRef.id)
+            batch.set(invoiceRef, invoiceToSave)
+
+            // 2. Update the Task
+            val taskRef = db.collection("Tasks").document(invoice.taskId)
+            // Storing the enum name as string if that's how it's stored, or the object. If tasks.status is stored as string:
+            batch.update(taskRef, "status", newStatus.name)
+
+            // Commit both at exactly the same time
+            batch.commit().await()
             true
         } catch (e: Exception) {
             e.printStackTrace()
@@ -90,17 +100,6 @@ class InvoiceRepository {
         awaitClose { listener.remove() }
     }
 
-
-    suspend fun updateInvoiceStatus(invoiceId: String, newStatus: InvoiceStatus): Boolean {
-        return try {
-            invoiceCollection.document(invoiceId).update(
-                "status", newStatus.name,
-                if (newStatus == InvoiceStatus.DISTRIBUTED) "distributedAt" else "updatedAt", java.util.Date()
-            ).await()
-            true
-        } catch (e: Exception) { false }
-    }
-
     suspend fun updatePaymentDetails(invoiceId: String, method: PaymentMethod, refNote: String): Boolean {
         return try {
             invoiceCollection.document(invoiceId).update(
@@ -125,6 +124,24 @@ class InvoiceRepository {
         } catch (e: Exception) { false }
     }
 
+    suspend fun markInvoiceApprovedAndUpdateTask(invoiceId: String, taskId: String): Boolean {
+        return try {
+            val batch = db.batch()
+
+            val invoiceRef = invoiceCollection.document(invoiceId)
+            batch.update(invoiceRef, mapOf(
+                "status" to InvoiceStatus.APPROVED.name,
+                "approvedAt" to java.util.Date()
+            ))
+
+            val taskRef = db.collection("Tasks").document(taskId)
+            batch.update(taskRef, "status", TaskStatus.CLOSED.name) // or use enum value depending on how it's saved. Usually string or enum works.
+
+            batch.commit().await()
+            true
+        } catch (e: Exception) { false }
+    }
+
     suspend fun updateInvoiceDistribution(invoiceId: String, newStatus: InvoiceStatus, personName: String, address: String): Boolean {
         return try {
             invoiceCollection.document(invoiceId).update(
@@ -139,23 +156,30 @@ class InvoiceRepository {
         } catch (e: Exception) { false }
     }
 
-    suspend fun adminForceApprovePayment(
+    suspend fun adminForceApprovePaymentAndUpdateTask(
         invoiceId: String,
+        taskId: String,
         method: PaymentMethod,
         refNote: String
     ): Boolean {
         return try {
-            invoiceCollection.document(invoiceId).update(
-                mapOf(
-                    "status" to InvoiceStatus.APPROVED.name, // Immediately moves to final state!
-                    "paymentMethod" to method.name,
-                    "paymentNotes" to refNote,
-                    "adminConfirmedPayment" to true,
-                    "accountantConfirmedPayment" to true, // Force this true so it's fully closed
-                    "paidAt" to java.util.Date(),
-                    "approvedAt" to java.util.Date()
-                )
-            ).await()
+            val batch = db.batch()
+
+            val invoiceRef = invoiceCollection.document(invoiceId)
+            batch.update(invoiceRef, mapOf(
+                "status" to InvoiceStatus.APPROVED.name, // Immediately moves to final state!
+                "paymentMethod" to method.name,
+                "paymentNotes" to refNote,
+                "adminConfirmedPayment" to true,
+                "accountantConfirmedPayment" to true, // Force this true so it's fully closed
+                "paidAt" to java.util.Date(),
+                "approvedAt" to java.util.Date()
+            ))
+
+            val taskRef = db.collection("Tasks").document(taskId)
+            batch.update(taskRef, "status", TaskStatus.CLOSED.name)
+
+            batch.commit().await()
             true
         } catch (e: Exception) { false }
     }

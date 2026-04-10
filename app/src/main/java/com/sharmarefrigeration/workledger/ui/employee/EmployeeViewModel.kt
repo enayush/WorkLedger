@@ -8,9 +8,7 @@ import com.sharmarefrigeration.workledger.data.TaskRepository
 import com.sharmarefrigeration.workledger.model.Task
 import com.sharmarefrigeration.workledger.model.TaskStatus
 import com.sharmarefrigeration.workledger.model.TaskType
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Date
 
@@ -20,11 +18,13 @@ class EmployeeViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
 
     // Dashboard State
-    private val _assignedTasks = MutableStateFlow<List<Task>>(emptyList())
-    val assignedTasks: StateFlow<List<Task>> = _assignedTasks.asStateFlow()
+    val assignedTasks: StateFlow<List<Task>> = (auth.currentUser?.uid?.let { uid ->
+        taskRepository.listenToAssignedTasksForEmployee(uid)
+    } ?: emptyFlow()).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _submittedTasks = MutableStateFlow<List<Task>>(emptyList())
-    val submittedTasks: StateFlow<List<Task>> = _submittedTasks.asStateFlow()
+    val submittedTasks: StateFlow<List<Task>> = (auth.currentUser?.uid?.let { uid ->
+        taskRepository.listenToRecentSubmittedTasks(uid)
+    } ?: emptyFlow()).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -39,33 +39,6 @@ class EmployeeViewModel : ViewModel() {
     private var lastVisibleHistoryDoc: DocumentSnapshot? = null
     private val _isLastHistoryPage = MutableStateFlow(false)
     val isLastHistoryPage: StateFlow<Boolean> = _isLastHistoryPage.asStateFlow()
-
-    init {
-        listenToDashboard()
-    }
-
-    private fun listenToDashboard() {
-        val uid = auth.currentUser?.uid ?: return
-
-        viewModelScope.launch {
-            _isLoading.value = true
-
-            // Listen to Assigned Tasks
-            launch {
-                taskRepository.listenToAssignedTasksForEmployee(uid).collect { tasks ->
-                    _assignedTasks.value = tasks
-                    _isLoading.value = false // Hide loader once data arrives
-                }
-            }
-
-            // Listen to Submitted Tasks
-            launch {
-                taskRepository.listenToRecentSubmittedTasks(uid).collect { tasks ->
-                    _submittedTasks.value = tasks
-                }
-            }
-        }
-    }
 
     // ✅ Cleaned up, streamlined save function with the new Data Model
     fun saveAdHocTask(
@@ -148,7 +121,7 @@ class EmployeeViewModel : ViewModel() {
 
     // Helper to get a specific task from the assigned list
     fun getAssignedTaskById(taskId: String): Task? {
-        return _assignedTasks.value.find { it.id == taskId }
+        return assignedTasks.value.find { it.id == taskId }
     }
 
     // New function to update an existing task instead of creating a new one
