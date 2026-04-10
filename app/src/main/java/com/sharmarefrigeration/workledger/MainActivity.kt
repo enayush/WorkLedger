@@ -74,19 +74,19 @@ class MainActivity : ComponentActivity() {
                             accountantViewModel = accountantViewModel,
                             adminViewModel = adminViewModel,
                             onLogout = {
-                                auth.signOut() // Log out of Firebase
-                                authViewModel.clearCache() // clear saved preferences
-                                authViewModel.setIdle() // Reset viewmodel
+                                auth.signOut()
+                                authViewModel.clearCache()
 
-                                // 1. Create a brand new, clean intent targeting MainActivity explicitly
+                                // 2. Prepare the clean restart intent
                                 val restartIntent = android.content.Intent(this@MainActivity, MainActivity::class.java)
-
-                                // 2. Add flags to completely clear the backstack
                                 restartIntent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
 
-                                // 3. Restart safely
+                                // 3. Restart the Activity
                                 finish()
                                 startActivity(restartIntent)
+                                // 4. Disable the default screen transition animation for a seamless wipe
+                                @Suppress("DEPRECATION")
+                                this@MainActivity.overridePendingTransition(0, 0)
                             }
                         )
                     }
