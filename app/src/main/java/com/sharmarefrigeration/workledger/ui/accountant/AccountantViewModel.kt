@@ -3,35 +3,16 @@ package com.sharmarefrigeration.workledger.ui.accountant
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.DocumentSnapshot
 import com.sharmarefrigeration.workledger.data.InvoiceRepository
 import com.sharmarefrigeration.workledger.data.TaskRepository
-import com.sharmarefrigeration.workledger.model.Invoice
-import com.sharmarefrigeration.workledger.model.Task
-import com.sharmarefrigeration.workledger.model.TaskStatus
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import com.sharmarefrigeration.workledger.model.*
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class AccountantViewModel : ViewModel() {
     private val taskRepository = TaskRepository()
     private val invoiceRepository = InvoiceRepository()
     private val auth = FirebaseAuth.getInstance()
-
-    private val _todayTotalValue = MutableStateFlow(0.0)
-    val todayTotalValue: StateFlow<Double> = _todayTotalValue.asStateFlow()
-
-    private val _todayBillsProcessed = MutableStateFlow(0)
-    val todayBillsProcessed: StateFlow<Int> = _todayBillsProcessed.asStateFlow()
-
-    // 1. The Inbox (Pending Tasks)
-    private val _pendingTasks = MutableStateFlow<List<Task>>(emptyList())
-    val pendingTasks: StateFlow<List<Task>> = _pendingTasks.asStateFlow()
-
-    // 2. The Outbox (Recent Invoices)
-    private val _recentInvoices = MutableStateFlow<List<Invoice>>(emptyList())
-    val recentInvoices: StateFlow<List<Invoice>> = _recentInvoices.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -42,45 +23,82 @@ class AccountantViewModel : ViewModel() {
     private val _isHistoryLoading = MutableStateFlow(false)
     val isHistoryLoading: StateFlow<Boolean> = _isHistoryLoading.asStateFlow()
 
-    private var lastVisibleHistoryDoc: DocumentSnapshot? = null
+    private var lastVisibleHistoryDoc: com.google.firebase.firestore.DocumentSnapshot? = null
     var isLastHistoryPage = false
 
-    init {
-        listenToLivePendingTasks()
-        listenToLiveInvoices()
-    }
+    // PIPELINE BUCKETS
+    private val _tasksNeedingBills = MutableStateFlow<List<Task>>(emptyList())
+    val tasksNeedingBills: StateFlow<List<Task>> = _tasksNeedingBills.asStateFlow()
 
-    private fun listenToLivePendingTasks() {
+    private val _activeInvoices = MutableStateFlow<List<Invoice>>(emptyList())
+
+    val invoicesToDistribute: StateFlow<List<Invoice>> = _activeInvoices.map { list ->
+        list.filter { it.status == InvoiceStatus.CREATED }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val invoicesToCollect: StateFlow<List<Invoice>> = _activeInvoices.map { list ->
+        list.filter { it.status == InvoiceStatus.DISTRIBUTED }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    init { listenToPipeline() }
+
+    private fun listenToPipeline() {
+        val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
-            taskRepository.listenToPendingBillingTasks().collect { tasks ->
-                _pendingTasks.value = tasks
-            }
+            launch { taskRepository.listenToPendingBillingTasks().collect { _tasksNeedingBills.value = it } }
+            launch { invoiceRepository.listenToRecentInvoices(uid).collect { _activeInvoices.value = it } }
         }
     }
-    fun fetchDashboardData() {
+
+    fun generateBill(task: Task, amount: Double, notes: String, onSuccess: () -> Unit) {
+        val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
             _isLoading.value = true
-            kotlinx.coroutines.delay(500)
+
+            val newInvoice = Invoice(
+                taskId = task.id,
+                requestedByUserId = uid,
+                amount = amount,
+                notes = notes,
+                status = InvoiceStatus.CREATED,
+                companyName = task.companyName,
+                workDone = task.workDone,
+                jobCardId = task.jobCardId,
+                employeeName = task.employeeName
+            )
+
+            if (invoiceRepository.createInvoice(newInvoice)) {
+                taskRepository.updateTaskStatus(task.id, TaskStatus.PENDING_APPROVAL)
+                onSuccess()
+            }
             _isLoading.value = false
         }
     }
 
-    // The Real-Time Listener (Runs silently in background)
-    private fun listenToLiveInvoices() {
-        val uid = auth.currentUser?.uid ?: return
+    fun markAsDistributed(invoiceId: String, personName: String, address: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            // This relies on the function we added to InvoiceRepository earlier!
-            invoiceRepository.listenToRecentInvoices(uid).collect { invoices ->
-                // This triggers instantly whenever Firestore changes!
-                _recentInvoices.value = invoices
-                calculateTodayStats(invoices)
-            }
+            _isLoading.value = true
+
+            // Note: You will need to update your InvoiceRepository to accept these extra strings!
+            invoiceRepository.updateInvoiceDistribution(invoiceId, InvoiceStatus.DISTRIBUTED, personName, address)
+
+            onSuccess()
+            _isLoading.value = false
         }
     }
 
-    // The Pagination Logic for the Billing Archive Profile Section
-    fun loadHistoryPage(isRefresh: Boolean = false) {
-        val uid = auth.currentUser?.uid ?: return
+    fun confirmPayment(invoiceId: String, method: PaymentMethod, referenceNote: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            invoiceRepository.updatePaymentDetails(invoiceId, method, referenceNote)
+            onSuccess()
+            _isLoading.value = false
+        }
+    }
+
+    fun loadHistoryPage(isRefresh: Boolean = false, targetUserId: String? = null) {
+        // Use targetUserId if provided, otherwise fallback to the logged-in user
+        val uid = targetUserId ?: auth.currentUser?.uid ?: return
 
         if (isRefresh) {
             lastVisibleHistoryDoc = null
@@ -93,7 +111,6 @@ class AccountantViewModel : ViewModel() {
         viewModelScope.launch {
             _isHistoryLoading.value = true
 
-            // This relies on the paginated function in InvoiceRepository
             val (newInvoices, lastDoc) = invoiceRepository.getAccountantHistoryPaginated(uid, lastVisibleHistoryDoc)
 
             if (newInvoices.isEmpty()) {
@@ -106,57 +123,4 @@ class AccountantViewModel : ViewModel() {
             _isHistoryLoading.value = false
         }
     }
-
-    private fun calculateTodayStats(invoices: List<Invoice>) {
-        val today = java.util.Calendar.getInstance()
-        today.set(java.util.Calendar.HOUR_OF_DAY, 0)
-        today.set(java.util.Calendar.MINUTE, 0)
-        today.set(java.util.Calendar.SECOND, 0)
-
-        val todaysInvoices = invoices.filter {
-            it.createdAt != null && it.createdAt!!.after(today.time)
-        }
-
-        _todayBillsProcessed.value = todaysInvoices.size
-        _todayTotalValue.value = todaysInvoices.sumOf { it.amount }
-    }
-
-    fun requestAdminApproval(task: Task, amount: Double, notes: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        val uid = auth.currentUser?.uid
-        if (uid == null) {
-            onError("Authentication error")
-            return
-        }
-
-        viewModelScope.launch {
-            _isLoading.value = true
-
-            val newInvoice = Invoice(
-                taskId = task.id,
-                amount = amount,
-                requestedByUserId = uid,
-                notes = notes,
-                isApproved = false
-            )
-
-            val invoiceSaved = invoiceRepository.createInvoice(newInvoice)
-
-            if (invoiceSaved) {
-                val taskUpdated = taskRepository.updateTaskStatus(task.id, TaskStatus.PENDING_APPROVAL)
-
-                if (taskUpdated) {
-                    onSuccess()
-                } else {
-                    onError("Invoice created, but failed to update task status.")
-                }
-            } else {
-                onError("Failed to create invoice.")
-            }
-            _isLoading.value = false
-        }
-    }
-
-
-
-
 }

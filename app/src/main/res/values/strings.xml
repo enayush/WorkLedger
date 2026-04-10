@@ -1,3 +1,15 @@
 <resources>
     <string name="app_name">Work Ledger</string>
+    <string name="log_work_saving_plea">Please wait, saving job details...</string>
+    <string name="log_work_technician_name">Technician: %s</string>
+    <string name="log_work_client_details_title">Client Details</string>
+    <string name="log_work_client_name_label">Company / Client Name</string>
+    <string name="log_work_client_address_label">Address / Location</string>
+    <string name="log_work_details_title">Work Details</string>
+    <string name="log_work_details_label">Describe Work Done &amp; Parts Replaced</string>
+    <string name="log_work_task_type_amc">AMC (Free)</string>
+    <string name="log_work_task_type_billable">Billable</string>
+    <string name="log_work_no_job_card_issued">No Job Card issued for this work</string>
+    <string name="log_work_job_card_id_label">Enter Job Card ID</string>
+    <string name="log_work_submit_button">Submit Log</string>
 </resources>

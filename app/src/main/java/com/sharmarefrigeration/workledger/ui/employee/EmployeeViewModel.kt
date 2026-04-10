@@ -3,22 +3,23 @@ package com.sharmarefrigeration.workledger.ui.employee
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.sharmarefrigeration.workledger.data.TaskRepository
 import com.sharmarefrigeration.workledger.model.Task
+import com.sharmarefrigeration.workledger.model.TaskStatus
+import com.sharmarefrigeration.workledger.model.TaskType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import com.google.firebase.firestore.DocumentSnapshot
+import java.util.Date
 
 class EmployeeViewModel : ViewModel() {
 
-    private val storageRepository = com.sharmarefrigeration.workledger.data.StorageRepository()
     private val taskRepository = TaskRepository()
     private val auth = FirebaseAuth.getInstance()
 
-    // State holding the list of tasks
-    private val _tasks = MutableStateFlow<List<Task>>(emptyList())
+    // Dashboard State
     private val _assignedTasks = MutableStateFlow<List<Task>>(emptyList())
     val assignedTasks: StateFlow<List<Task>> = _assignedTasks.asStateFlow()
 
@@ -28,9 +29,7 @@ class EmployeeViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _uploadProgress = MutableStateFlow(0)
-    val uploadProgress: StateFlow<Int> = _uploadProgress.asStateFlow()
-
+    // History Pagination State
     private val _historyTasks = MutableStateFlow<List<Task>>(emptyList())
     val historyTasks: StateFlow<List<Task>> = _historyTasks.asStateFlow()
 
@@ -40,31 +39,42 @@ class EmployeeViewModel : ViewModel() {
     private var lastVisibleHistoryDoc: DocumentSnapshot? = null
     var isLastHistoryPage = false
 
+    init {
+        listenToDashboard()
+    }
 
-    fun fetchDashboardData() {
+    private fun listenToDashboard() {
         val uid = auth.currentUser?.uid ?: return
 
         viewModelScope.launch {
             _isLoading.value = true
 
-            // Fetch both lists concurrently
-            _assignedTasks.value = taskRepository.getAssignedTasksForEmployee(uid)
-            _submittedTasks.value = taskRepository.getRecentSubmittedTasks(uid)
+            // Listen to Assigned Tasks
+            launch {
+                taskRepository.listenToAssignedTasksForEmployee(uid).collect { tasks ->
+                    _assignedTasks.value = tasks
+                    _isLoading.value = false // Hide loader once data arrives
+                }
+            }
 
-            _isLoading.value = false
+            // Listen to Submitted Tasks
+            launch {
+                taskRepository.listenToRecentSubmittedTasks(uid).collect { tasks ->
+                    _submittedTasks.value = tasks
+                }
+            }
         }
     }
 
-    init {
-        fetchDashboardData()
-    }
-
+    // ✅ Cleaned up, streamlined save function with the new Data Model
     fun saveAdHocTask(
-        context: android.content.Context, // NEW
-        title: String,
-        description: String,
-        type: com.sharmarefrigeration.workledger.model.TaskType,
-        imageUri: android.net.Uri?,       // NEW
+        companyName: String,
+        companyAddress: String,
+        workDone: String,
+        type: TaskType,
+        jobCardId: String?,
+        employeeName: String,
+        localDateString: String,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -76,54 +86,35 @@ class EmployeeViewModel : ViewModel() {
 
         viewModelScope.launch {
             _isLoading.value = true
-            _uploadProgress.value = 0
 
-            var uploadedImageUrl: String? = null
-            if (imageUri != null) {
-                //Pass the progress callback to the repository
-                uploadedImageUrl = storageRepository.uploadJobCardImage(context, imageUri) { progress ->
-                    _uploadProgress.value = progress
-                }
-
-                if (uploadedImageUrl == null) {
-                    _isLoading.value = false
-                    onError("Failed to upload image. Check network connection.")
-                    return@launch
-                }
-            }
-
-            // 2. Save the Task to Firestore with the image URL attached
-            val newTask = com.sharmarefrigeration.workledger.model.Task(
-                title = title,
-                description = description,
+            val newTask = Task(
+                companyName = companyName,
+                companyAddress = companyAddress,
+                workDone = workDone,
+                jobCardId = jobCardId,
+                localDateString = localDateString,
+                employeeName = employeeName,
                 assignedToUserId = uid,
                 createdByUserId = uid,
                 type = type,
-                jobCardImageUrl = uploadedImageUrl, // ✅ URL IS SAVED HERE
-                status = if (type == com.sharmarefrigeration.workledger.model.TaskType.BILL) {
-                    com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_BILLING
-                } else {
-                    com.sharmarefrigeration.workledger.model.TaskStatus.CLOSED
-                },
-                completedAt = java.util.Date()
+                status = if (type == TaskType.BILL) TaskStatus.PENDING_BILLING else TaskStatus.CLOSED,
+                completedAt = Date()
             )
 
             val success = taskRepository.saveTask(newTask)
             _isLoading.value = false
 
             if (success) {
-                fetchDashboardData()
                 onSuccess()
             } else {
                 onError("Failed to save task details.")
             }
-
-            _uploadProgress.value = 0
         }
     }
 
-    fun loadHistoryPage(isRefresh: Boolean = false) {
-        val uid = auth.currentUser?.uid ?: return
+    fun loadHistoryPage(isRefresh: Boolean = false, targetUserId: String? = null) {
+        // Use targetUserId if provided, otherwise fallback to the logged-in user
+        val uid = targetUserId ?: auth.currentUser?.uid ?: return
 
         if (isRefresh) {
             lastVisibleHistoryDoc = null
@@ -131,7 +122,6 @@ class EmployeeViewModel : ViewModel() {
             _historyTasks.value = emptyList()
         }
 
-        // Prevent double-fetching or fetching if we hit the end
         if (_isHistoryLoading.value || isLastHistoryPage) return
 
         viewModelScope.launch {
@@ -143,18 +133,42 @@ class EmployeeViewModel : ViewModel() {
             )
 
             if (newTasks.isEmpty()) {
-                isLastHistoryPage = true // No more data to fetch!
+                isLastHistoryPage = true
             } else {
-                // Append the new 10 tasks to the existing list
                 _historyTasks.value = _historyTasks.value + newTasks
                 lastVisibleHistoryDoc = lastDoc
 
-                // If we got fewer than 10, we know we hit the end of the database
                 if (newTasks.size < 10) isLastHistoryPage = true
             }
 
             _isHistoryLoading.value = false
         }
     }
-}
 
+    // Helper to get a specific task from the assigned list
+    fun getAssignedTaskById(taskId: String): Task? {
+        return _assignedTasks.value.find { it.id == taskId }
+    }
+
+    // New function to update an existing task instead of creating a new one
+    fun completeAssignedTask(
+        taskId: String,
+        workDone: String,
+        type: TaskType,
+        jobCardId: String?,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val success = taskRepository.completeAssignedTask(taskId, workDone, type, jobCardId)
+            _isLoading.value = false
+
+            if (success) {
+                onSuccess()
+            } else {
+                onError("Failed to submit work.")
+            }
+        }
+    }
+}

@@ -17,7 +17,7 @@ fun SwipeRefreshBox(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit // This accepts the UI you want to wrap!
+    content: @Composable () -> Unit
 ) {
     val pullToRefreshState = rememberPullToRefreshState()
 
@@ -30,7 +30,9 @@ fun SwipeRefreshBox(
 
     // Hide the spinner when loading finishes
     LaunchedEffect(isRefreshing) {
-        if (!isRefreshing) {
+        if (isRefreshing) {
+            pullToRefreshState.startRefresh()
+        } else {
             pullToRefreshState.endRefresh()
         }
     }
@@ -40,13 +42,13 @@ fun SwipeRefreshBox(
             .fillMaxSize()
             .nestedScroll(pullToRefreshState.nestedScrollConnection)
     ) {
-        // Render whatever screen UI was passed into this wrapper
         content()
 
-        // The spinning indicator
-        PullToRefreshContainer(
-            state = pullToRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
+        if (pullToRefreshState.isRefreshing || pullToRefreshState.verticalOffset > 0f) {
+            PullToRefreshContainer(
+                state = pullToRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
     }
 }

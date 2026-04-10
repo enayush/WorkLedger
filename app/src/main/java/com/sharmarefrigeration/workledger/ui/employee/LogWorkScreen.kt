@@ -1,193 +1,307 @@
 package com.sharmarefrigeration.workledger.ui.employee
 
-import android.content.Context
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.activity.compose.BackHandler
 import android.widget.Toast
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import com.sharmarefrigeration.workledger.model.TaskType
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.ui.draw.scale
 
-// Helper function to create a temporary file for the camera to write to
-fun Context.createImageFile(): File {
-    val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-    val storageDir = File(cacheDir, "images").apply { mkdirs() }
-    return File.createTempFile("JOBCARD_${timeStamp}_", ".jpg", storageDir)
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LogWorkScreen(
     viewModel: EmployeeViewModel,
+    employeeName: String, // Passed from AppShell!
+    taskIdToComplete: String? = null,
     onBack: () -> Unit,
     onTaskSaved: () -> Unit
 ) {
     val context = LocalContext.current
-
     val focusManager = LocalFocusManager.current
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf(TaskType.AMC) }
+    val scrollState = rememberScrollState()
 
-    // State to hold the image we just took
-    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var tempImageUri by remember { mutableStateOf<Uri?>(null) }
+    // Form State
+    var companyName by remember { mutableStateOf("") }
+    var companyAddress by remember { mutableStateOf("") }
+    var workDone by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf(TaskType.AMC) }
+    var workToBeDone by remember { mutableStateOf("") }
+    // Job Card State
+    var hasJobCard by remember { mutableStateOf(true) }
+    var jobCardId by remember { mutableStateOf("") }
+
+    var isSubmitting by remember { mutableStateOf(false) }
+    var isSuccess by remember { mutableStateOf(false) }
 
     val isLoading by viewModel.isLoading.collectAsState()
-    val uploadProgress by viewModel.uploadProgress.collectAsState()
+
+    LaunchedEffect(taskIdToComplete) {
+        if (taskIdToComplete != null) {
+            val task = viewModel.getAssignedTaskById(taskIdToComplete)
+            if (task != null) {
+                companyName = task.companyName
+                companyAddress = task.companyAddress
+                workToBeDone = task.workToBeDone
+            }
+        }
+    }
+
+    // Generate Local Date safely formatting the exact day on the device
+    val localDateString = remember {
+        SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date())
+    }
 
     BackHandler(enabled = isLoading) {
         Toast.makeText(context, "Please wait, saving job details...", Toast.LENGTH_SHORT).show()
     }
 
-    // The Camera Launcher
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success) {
-            // If the user hit the checkmark in the camera, save the URI!
-            capturedImageUri = tempImageUri
+    Scaffold(
+        bottomBar = {
+            val isFormValid = companyName.isNotBlank() && workDone.isNotBlank() && (!hasJobCard || jobCardId.isNotBlank())
+            Surface(
+                shadowElevation = 8.dp,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Button(
+                    onClick = {
+                        if (isSubmitting || isSuccess) return@Button
+                        isSubmitting = true
+                        if (taskIdToComplete != null) {
+                            // Flow A: Completing assigned task
+                            viewModel.completeAssignedTask(
+                                taskId = taskIdToComplete,
+                                workDone = workDone,
+                                type = selectedType,
+                                jobCardId = if (hasJobCard) jobCardId else null,
+                                onSuccess = {
+                                    isSuccess = true
+                                    onTaskSaved()
+                                },
+                                onError = {
+                                    isSubmitting = false
+                                    Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                                }
+                            )
+                        } else{
+                        viewModel.saveAdHocTask(
+                            companyName = companyName,
+                            companyAddress = companyAddress,
+                            workDone = workDone,
+                            type = selectedType,
+                            jobCardId = if (hasJobCard) jobCardId else null,
+                            employeeName = employeeName,
+                            localDateString = localDateString,
+                            onSuccess = {
+                                isSuccess = true
+                                onTaskSaved()
+                            },
+                            onError = {
+                                isSubmitting = false
+                                Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                            }
+                        )
+                            }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    enabled = isFormValid && !isLoading && !isSubmitting && !isSuccess,
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    if (isLoading || isSubmitting || isSuccess) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                    } else {
+                        Text(if (taskIdToComplete != null) "Complete Assigned Job" else "Submit Log")
+                    }
+                }
+            }
         }
-    }
-
-    Scaffold() { paddingValues ->
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = {
-                        focusManager.clearFocus()
-                    })
-                },
+                .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
+                .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Short Title (e.g., AC Repair)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
 
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Details / Replaced Parts") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3
-            )
-
-            Text("Job Type", style = MaterialTheme.typography.titleMedium)
+            // --- HEADER ---
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = selectedType == TaskType.AMC,
-                        onClick = { selectedType = TaskType.AMC }
-                    )
-                    Text("AMC (Free)")
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = selectedType == TaskType.BILL,
-                        onClick = { selectedType = TaskType.BILL }
-                    )
-                    Text("Billable")
-                }
-            }
-
-            // The magical Camera Button
-            Button(
-                onClick = {
-                    // 1. Create the empty file
-                    val file = context.createImageFile()
-                    // 2. Get the secure FileProvider URI
-                    val uri = FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        file
-                    )
-                    tempImageUri = uri
-                    // 3. Launch the native camera
-                    cameraLauncher.launch(uri)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (capturedImageUri != null)
-                        MaterialTheme.colorScheme.tertiary
-                    else
-                        MaterialTheme.colorScheme.secondary
-                )
-            ) {
-                if (capturedImageUri != null) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Job Card Captured!")
-                } else {
-                    Icon(Icons.Default.CameraAlt, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Snap Job Card Picture")
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Button(
-                onClick = {
-                    viewModel.saveAdHocTask(
-                        context = context,
-                        title = title,
-                        description = description,
-                        type = selectedType,
-                        imageUri = capturedImageUri,
-                        onSuccess = onTaskSaved,
-                        onError = { /* Show error toast */ }
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = title.isNotBlank() && !isLoading
-            ) {
-                if (isLoading) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        if (uploadProgress in 1..99) {
-                            Text("Uploading $uploadProgress%")
+                IconButton(
+                    onClick = {
+                        if (isLoading) {
+                            Toast.makeText(context, "Please wait, saving job details...", Toast.LENGTH_SHORT).show()
                         } else {
-                            Text("Saving...")
+                            onBack()
                         }
                     }
-                } else {
-                    Text("Save Job")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                    shape = MaterialTheme.shapes.medium,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Technician : $employeeName", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        Text(localDateString, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f))
+                    }
                 }
             }
+
+            // --- CLIENT DETAILS ---
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Client Details", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    OutlinedTextField(
+                        value = companyName,
+                        onValueChange = { companyName = it },
+                        label = { Text("Company / Client Name", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        shape = MaterialTheme.shapes.medium
+                    )
+                    OutlinedTextField(
+                        value = companyAddress,
+                        onValueChange = { companyAddress = it },
+                        label = { Text("Address / Location", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        shape = MaterialTheme.shapes.medium
+                    )
+                }
+            }
+
+            // --- ADMIN INSTRUCTIONS ---
+            if (workToBeDone.isNotBlank()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Admin Instructions:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(workToBeDone, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+
+            // --- JOB DETAILS ---
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Work Details", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    OutlinedTextField(
+                        value = workDone,
+                        onValueChange = { workDone = it },
+                        label = { Text("Describe Work Done & Parts Replaced", style = MaterialTheme.typography.bodySmall) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        shape = MaterialTheme.shapes.medium
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedType == TaskType.AMC,
+                                onClick = { selectedType = TaskType.AMC },
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Text("AMC (Free)", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedType == TaskType.BILL,
+                                onClick = { selectedType = TaskType.BILL },
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Text("Billable", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+
+            // --- JOB CARD SECTION ---
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Job Card", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(
+                            checked = hasJobCard,
+                            onCheckedChange = {
+                                hasJobCard = it
+                                if (!hasJobCard) jobCardId = ""
+                            },
+                            modifier = Modifier.scale(0.8f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (hasJobCard) "Job Card Issued" else "No Job Card Issued", style = MaterialTheme.typography.bodyMedium)
+                    }
+
+                    if (hasJobCard) {
+                        OutlinedTextField(
+                            value = jobCardId,
+                            onValueChange = { jobCardId = it },
+                            label = { Text("Enter Job Card ID", style = MaterialTheme.typography.bodySmall) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                            shape = MaterialTheme.shapes.medium
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

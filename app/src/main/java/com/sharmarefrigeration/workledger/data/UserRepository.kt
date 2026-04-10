@@ -16,7 +16,24 @@ class UserRepository {
                 .await()
 
             if (!snapshot.isEmpty) {
-                // Return the first matching user document
+                snapshot.documents[0].toObject(User::class.java)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    suspend fun getUserProfileByUsername(username: String): User? {
+        return try {
+            val snapshot = usersCollection
+                .whereEqualTo("username", username) // Search by username now
+                .get()
+                .await()
+
+            if (!snapshot.isEmpty) {
                 snapshot.documents[0].toObject(User::class.java)
             } else {
                 null
@@ -40,4 +57,19 @@ class UserRepository {
             false
         }
     }
+
+    suspend fun getStaffByRole(role: com.sharmarefrigeration.workledger.model.UserRole): List<com.sharmarefrigeration.workledger.model.User> {
+        return try {
+            val snapshot = usersCollection
+                .whereEqualTo("role", role.name)
+                .whereEqualTo("isActive", true)
+                .get()
+                .await()
+            snapshot.toObjects(com.sharmarefrigeration.workledger.model.User::class.java)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+
 }

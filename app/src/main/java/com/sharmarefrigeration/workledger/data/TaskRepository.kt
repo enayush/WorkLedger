@@ -34,7 +34,7 @@ class TaskRepository {
         return try {
             val snapshot = tasksCollection
                 .whereEqualTo("assignedToUserId", uid)
-                .whereEqualTo("status", com.sharmarefrigeration.workledger.model.TaskStatus.ASSIGNED.name)
+                .whereEqualTo("status", com.sharmarefrigeration.workledger.model.TaskStatus.ASSIGNED)
                 .get()
                 .await()
 
@@ -48,12 +48,12 @@ class TaskRepository {
     suspend fun getRecentSubmittedTasks(uid: String): List<Task> {
         return try {
             val snapshot = tasksCollection
-                .whereEqualTo("createdByUserId", uid)
+                .whereEqualTo("assignedToUserId", uid)
                 // We fetch tasks that are waiting for billing or already closed
                 .whereIn("status", listOf(
-                    com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_BILLING.name,
-                    com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_APPROVAL.name,
-                    com.sharmarefrigeration.workledger.model.TaskStatus.CLOSED.name
+                    com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_BILLING,
+                    com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_APPROVAL,
+                    com.sharmarefrigeration.workledger.model.TaskStatus.CLOSED
                 ))
                 .get()
                 .await()
@@ -91,7 +91,7 @@ class TaskRepository {
     suspend fun updateTaskStatus(taskId: String, newStatus: com.sharmarefrigeration.workledger.model.TaskStatus): Boolean {
         return try {
             tasksCollection.document(taskId)
-                .update("status", newStatus.name)
+                .update("status", newStatus)
                 .await()
             true
         } catch (e: Exception) {
@@ -107,7 +107,7 @@ class TaskRepository {
     ): Pair<List<Task>, DocumentSnapshot?> {
         return try {
             var query = tasksCollection
-                .whereEqualTo("createdByUserId", uid)
+                .whereEqualTo("assignedToUserId", uid)
                 .orderBy("completedAt", Query.Direction.DESCENDING)
                 .limit(limit)
 
@@ -135,7 +135,7 @@ class TaskRepository {
     fun listenToPendingBillingTasks(): kotlinx.coroutines.flow.Flow<List<com.sharmarefrigeration.workledger.model.Task>> = kotlinx.coroutines.flow.callbackFlow {
         val listener = tasksCollection
             // Make sure this status matches whatever you use for bills waiting to be processed!
-            .whereEqualTo("status", com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_BILLING.name)
+            .whereEqualTo("status", com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_BILLING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     close(error)
@@ -148,5 +148,131 @@ class TaskRepository {
             }
 
         awaitClose { listener.remove() }
+    }
+
+    // --- LIVE LISTENERS FOR EMPLOYEE DASHBOARD ---
+
+    fun listenToAssignedTasksForEmployee(uid: String): kotlinx.coroutines.flow.Flow<List<Task>> = kotlinx.coroutines.flow.callbackFlow {
+        val listener = tasksCollection
+            .whereEqualTo("assignedToUserId", uid)
+            .whereEqualTo("status", com.sharmarefrigeration.workledger.model.TaskStatus.ASSIGNED)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { close(error); return@addSnapshotListener }
+                if (snapshot != null) {
+                    val tasks = snapshot.toObjects(Task::class.java).sortedBy { it.createdAt }
+                    trySend(tasks)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    fun listenToRecentSubmittedTasks(uid: String): kotlinx.coroutines.flow.Flow<List<Task>> = kotlinx.coroutines.flow.callbackFlow {
+        val listener = tasksCollection
+            .whereEqualTo("assignedToUserId", uid)
+            .whereIn("status", listOf(
+                com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_BILLING,
+                com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_APPROVAL,
+                com.sharmarefrigeration.workledger.model.TaskStatus.CLOSED
+            ))
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { close(error); return@addSnapshotListener }
+                if (snapshot != null) {
+                    val tasks = snapshot.toObjects(Task::class.java)
+                        .sortedByDescending { it.completedAt }
+                        .take(10) // Only keep top 10
+                    trySend(tasks)
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    fun listenToActiveTasksForAdmin(): kotlinx.coroutines.flow.Flow<List<Task>> = kotlinx.coroutines.flow.callbackFlow {
+        val listener = tasksCollection
+            .whereIn("status", listOf(
+                com.sharmarefrigeration.workledger.model.TaskStatus.UNASSIGNED,
+                com.sharmarefrigeration.workledger.model.TaskStatus.ASSIGNED,
+                com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_BILLING
+            ))
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { close(error); return@addSnapshotListener }
+                snapshot?.let { trySend(it.toObjects(Task::class.java)) }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    // Flow: Employee completes an assigned task
+    suspend fun completeAssignedTask(
+        taskId: String,
+        workDone: String,
+        type: com.sharmarefrigeration.workledger.model.TaskType,
+        jobCardId: String?
+    ): Boolean {
+        return try {
+            val newStatus = if (type == com.sharmarefrigeration.workledger.model.TaskType.BILL) {
+                com.sharmarefrigeration.workledger.model.TaskStatus.PENDING_BILLING
+            } else {
+                com.sharmarefrigeration.workledger.model.TaskStatus.CLOSED
+            }
+
+            tasksCollection.document(taskId).update(
+                mapOf(
+                    "workDone" to workDone,
+                    "type" to type,
+                    "jobCardId" to jobCardId,
+                    "status" to newStatus,
+                    "completedAt" to java.util.Date()
+                )
+            ).await()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    // Fetch active/unassigned tasks ONCE (no flow/listener)
+    suspend fun getManageableTasks(): List<Task> {
+        return try {
+            val snapshot = tasksCollection
+                .whereIn("status", listOf(
+                    com.sharmarefrigeration.workledger.model.TaskStatus.UNASSIGNED.name,
+                    com.sharmarefrigeration.workledger.model.TaskStatus.ASSIGNED.name
+                ))
+                .get()
+                .await()
+
+            // Fetch and sort locally so we don't trigger a missing Firebase Index error
+            snapshot.toObjects(Task::class.java).sortedByDescending { it.createdAt }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    // Permanently delete a task
+    suspend fun deleteTask(taskId: String): Boolean {
+        return try {
+            tasksCollection.document(taskId).delete().await()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun getTasksByDateRange(startDate: java.util.Date, endDate: java.util.Date): List<Task> {
+        return try {
+            val snapshot = tasksCollection
+                .whereGreaterThanOrEqualTo("createdAt", startDate)
+                .whereLessThanOrEqualTo("createdAt", endDate)
+                .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .get()
+                .await()
+
+            snapshot.toObjects(Task::class.java)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
     }
 }

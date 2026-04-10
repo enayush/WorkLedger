@@ -5,9 +5,12 @@ import com.sharmarefrigeration.workledger.model.Invoice
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Query
+import com.sharmarefrigeration.workledger.model.InvoiceStatus
+import com.sharmarefrigeration.workledger.model.PaymentMethod
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlin.collections.remove
 
 class InvoiceRepository {
     private val db = FirebaseFirestore.getInstance()
@@ -27,56 +30,7 @@ class InvoiceRepository {
         }
     }
 
-    // 1. Fetch invoices waiting for Admin approval
-    suspend fun getPendingInvoices(): List<Invoice> {
-        return try {
-            val snapshot = invoiceCollection
-                .whereEqualTo("approved", false)
-                .get()
-                .await()
-
-            snapshot.toObjects(Invoice::class.java).sortedBy { it.createdAt }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
-        }
-    }
-
-    // 2. Mark invoice as approved by the Admin
-    suspend fun markInvoiceApproved(invoiceId: String, adminId: String): Boolean {
-        return try {
-            invoiceCollection.document(invoiceId)
-                .update(
-                    "isApproved", true,
-                    "approvedByUserId", adminId
-                )
-                .await()
-            true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
-
-    suspend fun getRecentInvoices(accountantId: String): List<com.sharmarefrigeration.workledger.model.Invoice> {
-        return try {
-            val snapshot = invoiceCollection
-                .whereEqualTo("requestedByUserId", accountantId)
-                .get()
-                .await()
-
-            // Sort them so the newest ones are at the top, and take the latest 10
-            // Note: We use the 'createdAt' field we saw in your Firestore screenshot!
-            snapshot.toObjects(com.sharmarefrigeration.workledger.model.Invoice::class.java)
-                .sortedByDescending { it.createdAt }
-                .take(10)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
-        }
-    }
-
-    fun listenToRecentInvoices(accountantId: String): Flow<List<com.sharmarefrigeration.workledger.model.Invoice>> = callbackFlow {
+    fun listenToRecentInvoices(accountantId: String): Flow<List<Invoice>> = callbackFlow {
         val listener = invoiceCollection
             .whereEqualTo("requestedByUserId", accountantId)
             .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -87,12 +41,10 @@ class InvoiceRepository {
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val invoices = snapshot.toObjects(com.sharmarefrigeration.workledger.model.Invoice::class.java)
+                    val invoices = snapshot.toObjects(Invoice::class.java)
                     trySend(invoices) // Instantly push new data to the UI!
                 }
             }
-
-        // When the ViewModel dies, this cleanly closes the Firebase pipe
         awaitClose { listener.remove() }
     }
 
@@ -100,7 +52,7 @@ class InvoiceRepository {
         uid: String,
         lastVisible: DocumentSnapshot?,
         limit: Long = 10
-    ): Pair<List<com.sharmarefrigeration.workledger.model.Invoice>, DocumentSnapshot?> {
+    ): Pair<List<Invoice>, DocumentSnapshot?> {
         return try {
             var query = invoiceCollection
                 .whereEqualTo("requestedByUserId", uid)
@@ -112,7 +64,7 @@ class InvoiceRepository {
             }
 
             val snapshot = query.get().await()
-            val invoices = snapshot.toObjects(com.sharmarefrigeration.workledger.model.Invoice::class.java)
+            val invoices = snapshot.toObjects(Invoice::class.java)
 
             val newLastVisible = if (snapshot.documents.isNotEmpty()) {
                 snapshot.documents[snapshot.documents.size - 1]
@@ -125,20 +77,103 @@ class InvoiceRepository {
         }
     }
 
-    fun listenToPendingInvoices(): kotlinx.coroutines.flow.Flow<List<com.sharmarefrigeration.workledger.model.Invoice>> = kotlinx.coroutines.flow.callbackFlow {
+    fun listenToPendingInvoices(): Flow<List<Invoice>> = callbackFlow {
         val listener = invoiceCollection
-            .whereEqualTo("isApproved", false)
+            .whereIn("status", listOf(
+                InvoiceStatus.DISTRIBUTED.name,
+                InvoiceStatus.PAYMENT_RECEIVED.name
+            ))
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                if (snapshot != null) {
-                    val invoices = snapshot.toObjects(com.sharmarefrigeration.workledger.model.Invoice::class.java)
-                    trySend(invoices)
-                }
+                if (error != null) { close(error); return@addSnapshotListener }
+                snapshot?.let { trySend(it.toObjects(Invoice::class.java)) }
             }
-
         awaitClose { listener.remove() }
     }
+
+
+    suspend fun updateInvoiceStatus(invoiceId: String, newStatus: InvoiceStatus): Boolean {
+        return try {
+            invoiceCollection.document(invoiceId).update(
+                "status", newStatus.name,
+                if (newStatus == InvoiceStatus.DISTRIBUTED) "distributedAt" else "updatedAt", java.util.Date()
+            ).await()
+            true
+        } catch (e: Exception) { false }
+    }
+
+    suspend fun updatePaymentDetails(invoiceId: String, method: PaymentMethod, refNote: String): Boolean {
+        return try {
+            invoiceCollection.document(invoiceId).update(
+                mapOf(
+                    "status" to InvoiceStatus.PAYMENT_RECEIVED.name,
+                    "paymentMethod" to method.name,
+                    "paymentNotes" to refNote,
+                    "paidAt" to java.util.Date()
+                )
+            ).await()
+            true
+        } catch (e: Exception) { false }
+    }
+
+    suspend fun markInvoiceApproved(invoiceId: String): Boolean {
+        return try {
+            invoiceCollection.document(invoiceId).update(
+                "status", InvoiceStatus.APPROVED.name,
+                "approvedAt", java.util.Date()
+            ).await()
+            true
+        } catch (e: Exception) { false }
+    }
+
+    suspend fun updateInvoiceDistribution(invoiceId: String, newStatus: InvoiceStatus, personName: String, address: String): Boolean {
+        return try {
+            invoiceCollection.document(invoiceId).update(
+                mapOf(
+                    "status" to newStatus.name,
+                    "distributedToPerson" to personName,
+                    "distributedAddress" to address,
+                    "distributedAt" to java.util.Date()
+                )
+            ).await()
+            true
+        } catch (e: Exception) { false }
+    }
+
+    suspend fun adminForceApprovePayment(
+        invoiceId: String,
+        method: PaymentMethod,
+        refNote: String
+    ): Boolean {
+        return try {
+            invoiceCollection.document(invoiceId).update(
+                mapOf(
+                    "status" to InvoiceStatus.APPROVED.name, // Immediately moves to final state!
+                    "paymentMethod" to method.name,
+                    "paymentNotes" to refNote,
+                    "adminConfirmedPayment" to true,
+                    "accountantConfirmedPayment" to true, // Force this true so it's fully closed
+                    "paidAt" to java.util.Date(),
+                    "approvedAt" to java.util.Date()
+                )
+            ).await()
+            true
+        } catch (e: Exception) { false }
+    }
+
+    suspend fun getInvoicesByDateRange(startDate: java.util.Date, endDate: java.util.Date): List<Invoice> {
+        return try {
+            val snapshot = invoiceCollection
+                .whereGreaterThanOrEqualTo("createdAt", startDate)
+                .whereLessThanOrEqualTo("createdAt", endDate)
+                .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .get()
+                .await()
+
+            snapshot.toObjects(Invoice::class.java)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
 }
