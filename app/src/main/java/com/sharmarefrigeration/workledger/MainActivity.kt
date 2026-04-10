@@ -77,6 +77,16 @@ class MainActivity : ComponentActivity() {
                                 auth.signOut() // Log out of Firebase
                                 authViewModel.clearCache() // clear saved preferences
                                 authViewModel.setIdle() // Reset viewmodel
+
+                                // 1. Create a brand new, clean intent targeting MainActivity explicitly
+                                val restartIntent = android.content.Intent(this@MainActivity, MainActivity::class.java)
+
+                                // 2. Add flags to completely clear the backstack
+                                restartIntent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+
+                                // 3. Restart safely
+                                finish()
+                                startActivity(restartIntent)
                             }
                         )
                     }

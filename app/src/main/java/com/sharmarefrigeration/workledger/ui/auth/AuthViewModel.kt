@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
+import androidx.core.content.edit
 
 sealed class AuthState {
     object Idle : AuthState()
@@ -99,14 +100,14 @@ class AuthViewModel(context: Context) : ViewModel() {
 
                 if (userProfile != null) {
                     if (userProfile.isActive) {
-                        prefs.edit()
-                            .putString("user_id", userProfile.id)
-                            .putString("user_phone", userProfile.phoneNumber)
-                            .putString("user_name", userProfile.name)
-                            .putString("user_username", userProfile.username)
-                            .putString("user_role", userProfile.role.name)
-                            .putBoolean("user_is_active", userProfile.isActive)
-                            .apply()
+                        prefs.edit {
+                            putString("user_id", userProfile.id)
+                                .putString("user_phone", userProfile.phoneNumber)
+                                .putString("user_name", userProfile.name)
+                                .putString("user_username", userProfile.username)
+                                .putString("user_role", userProfile.role.name)
+                                .putBoolean("user_is_active", userProfile.isActive)
+                        }
 
                         _authState.value = AuthState.Authenticated(userProfile)
                     } else {
@@ -138,6 +139,6 @@ class AuthViewModel(context: Context) : ViewModel() {
     }
 
     fun clearCache() {
-        prefs.edit().clear().apply()
+        prefs.edit { clear() }
     }
 }
