@@ -24,7 +24,9 @@ class AccountantViewModel : ViewModel() {
     val isHistoryLoading: StateFlow<Boolean> = _isHistoryLoading.asStateFlow()
 
     private var lastVisibleHistoryDoc: com.google.firebase.firestore.DocumentSnapshot? = null
-    var isLastHistoryPage = false
+
+    private val _isLastHistoryPage = MutableStateFlow(false)
+    val isLastHistoryPage: StateFlow<Boolean> = _isLastHistoryPage.asStateFlow()
 
     // PIPELINE BUCKETS
     private val _tasksNeedingBills = MutableStateFlow<List<Task>>(emptyList())
@@ -102,11 +104,11 @@ class AccountantViewModel : ViewModel() {
 
         if (isRefresh) {
             lastVisibleHistoryDoc = null
-            isLastHistoryPage = false
+            _isLastHistoryPage.value = false
             _historyInvoices.value = emptyList()
         }
 
-        if (_isHistoryLoading.value || isLastHistoryPage) return
+        if (_isHistoryLoading.value || _isLastHistoryPage.value) return
 
         viewModelScope.launch {
             _isHistoryLoading.value = true
@@ -114,11 +116,11 @@ class AccountantViewModel : ViewModel() {
             val (newInvoices, lastDoc) = invoiceRepository.getAccountantHistoryPaginated(uid, lastVisibleHistoryDoc)
 
             if (newInvoices.isEmpty()) {
-                isLastHistoryPage = true
+                _isLastHistoryPage.value = true
             } else {
                 _historyInvoices.value = _historyInvoices.value + newInvoices
                 lastVisibleHistoryDoc = lastDoc
-                if (newInvoices.size < 10) isLastHistoryPage = true
+                if (newInvoices.size < 10) _isLastHistoryPage.value = true
             }
             _isHistoryLoading.value = false
         }

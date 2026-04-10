@@ -63,25 +63,49 @@ fun AppShell(
                                 icon = { Icon(Icons.AutoMirrored.Filled.Assignment, contentDescription = "Ops") },
                                 label = { Text("Ops", maxLines = 1) },
                                 selected = currentRoute == "admin_ops",
-                                onClick = { navController.navigate("admin_ops") { launchSingleTop = true; restoreState = true } }
+                                onClick = {
+                                    navController.navigate("admin_ops") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                             NavigationBarItem(
                                 icon = { Icon(Icons.AutoMirrored.Filled.FactCheck, contentDescription = "Approvals") },
                                 label = { Text("Approve", maxLines = 1) },
                                 selected = currentRoute == "admin_approvals",
-                                onClick = { navController.navigate("admin_approvals") { launchSingleTop = true; restoreState = true } }
+                                onClick = {
+                                    navController.navigate("admin_approvals") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                             NavigationBarItem(
                                 icon = { Icon(Icons.Default.People, contentDescription = "Team") },
                                 label = { Text("Team", maxLines = 1) },
                                 selected = currentRoute == "admin_directory",
-                                onClick = { navController.navigate("admin_directory") { launchSingleTop = true; restoreState = true } }
+                                onClick = {
+                                    navController.navigate("admin_directory") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                             NavigationBarItem(
                                 icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
                                 label = { Text("Profile", maxLines = 1) },
                                 selected = currentRoute == "profile",
-                                onClick = { navController.navigate("profile") { launchSingleTop = true; restoreState = true } }
+                                onClick = {
+                                    navController.navigate("profile") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                         }
                         // --- ACCOUNTANT TABS ---
@@ -90,25 +114,49 @@ fun AppShell(
                                 icon = { Icon(Icons.Default.Receipt, contentDescription = "Create") },
                                 label = { Text("Create", maxLines = 1) },
                                 selected = currentRoute == "acc_create",
-                                onClick = { navController.navigate("acc_create") { launchSingleTop = true; restoreState = true } }
+                                onClick = {
+                                    navController.navigate("acc_create") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                             NavigationBarItem(
                                 icon = { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send") },
                                 label = { Text("Send", maxLines = 1) },
                                 selected = currentRoute == "acc_distribute",
-                                onClick = { navController.navigate("acc_distribute") { launchSingleTop = true; restoreState = true } }
+                                onClick = {
+                                    navController.navigate("acc_distribute") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                             NavigationBarItem(
                                 icon = { Icon(Icons.Default.Payments, contentDescription = "Collect") },
                                 label = { Text("Collect", maxLines = 1) },
                                 selected = currentRoute == "acc_collect",
-                                onClick = { navController.navigate("acc_collect") { launchSingleTop = true; restoreState = true } }
+                                onClick = {
+                                    navController.navigate("acc_collect") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                             NavigationBarItem(
                                 icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
                                 label = { Text("Profile", maxLines = 1) },
                                 selected = currentRoute == "profile",
-                                onClick = { navController.navigate("profile") { launchSingleTop = true; restoreState = true } }
+                                onClick = {
+                                    navController.navigate("profile") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                         }
                         // --- EMPLOYEE TABS ---
@@ -117,13 +165,25 @@ fun AppShell(
                                 icon = { Icon(Icons.Default.Home, contentDescription = "Dashboard") },
                                 label = { Text("Dashboard") },
                                 selected = currentRoute == "dashboard",
-                                onClick = { navController.navigate("dashboard") { launchSingleTop = true; restoreState = true } }
+                                onClick = {
+                                    navController.navigate("dashboard") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                             NavigationBarItem(
                                 icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
                                 label = { Text("Profile") },
                                 selected = currentRoute == "profile",
-                                onClick = { navController.navigate("profile") { launchSingleTop = true; restoreState = true } }
+                                onClick = {
+                                    navController.navigate("profile") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
                             )
                         }
                     }

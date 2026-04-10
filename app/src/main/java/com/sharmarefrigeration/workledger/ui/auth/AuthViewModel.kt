@@ -93,14 +93,12 @@ class AuthViewModel(context: Context) : ViewModel() {
     private fun verifyUserRole(username: String) {
         viewModelScope.launch {
             try {
-                // Add an 8-second timeout if the network is really slow so the user is not stuck on the splash screen
                 val userProfile = withTimeoutOrNull(8000) {
                     userRepository.getUserProfileByUsername(username)
                 }
 
                 if (userProfile != null) {
                     if (userProfile.isActive) {
-                        // Success -> Cache the verified user and update state silently
                         prefs.edit()
                             .putString("user_id", userProfile.id)
                             .putString("user_phone", userProfile.phoneNumber)
@@ -117,15 +115,24 @@ class AuthViewModel(context: Context) : ViewModel() {
                         _authState.value = AuthState.Error("Your access has been revoked by the Admin.")
                     }
                 } else {
-                    // Fail -> Time out or not found
-                    auth.signOut()
-                    clearCache()
-                    _authState.value = AuthState.Error("Session check timed out or user not found. Please log in again.")
+                    val hasCachedSession = prefs.getString("user_id", null) != null
+
+                    if (hasCachedSession) {
+                        // Do nothing! They are offline, but checkExistingSession() already let them in.
+                        // Firebase offline persistence will queue their reads/writes.
+                    } else {
+                        auth.signOut()
+                        clearCache()
+                        _authState.value = AuthState.Error("Network error. Please check your connection and log in again.")
+                    }
                 }
             } catch (e: Exception) {
-                auth.signOut()
-                clearCache()
-                _authState.value = AuthState.Error("Failed to verify session: ${e.localizedMessage}")
+                val hasCachedSession = prefs.getString("user_id", null) != null
+                if (!hasCachedSession) {
+                    auth.signOut()
+                    clearCache()
+                    _authState.value = AuthState.Error("Failed to verify session: ${e.localizedMessage}")
+                }
             }
         }
     }

@@ -26,6 +26,7 @@ fun WorkLedgerScreen(
 ) {
     val historyTasks by viewModel.historyTasks.collectAsState()
     val isLoading by viewModel.isHistoryLoading.collectAsState()
+    val isLastHistoryPage by viewModel.isLastHistoryPage.collectAsState()
     val context = LocalContext.current
 
     var isSwipeRefreshing by remember { mutableStateOf(false) }
@@ -104,7 +105,7 @@ fun WorkLedgerScreen(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("No past jobs found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                } else if (historyTasks.isEmpty() && isLoading && !isSwipeRefreshing) {
+                } else if (historyTasks.isEmpty() && !isSwipeRefreshing) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
@@ -120,7 +121,7 @@ fun WorkLedgerScreen(
 
                             // --- THE INFINITE SCROLL TRIGGER ---
                             // If we scrolled to the last item, tell the ViewModel to get 10 more
-                            if (index == historyTasks.lastIndex && !isLoading && !viewModel.isLastHistoryPage) {
+                            if (index == historyTasks.lastIndex && !isLoading && !isLastHistoryPage) {
                                 LaunchedEffect(key1 = index) {
                                     viewModel.loadHistoryPage(targetUserId = targetUserId)
                                 }
@@ -137,7 +138,7 @@ fun WorkLedgerScreen(
                         }
 
                         // Optional: Show text when they hit the very bottom
-                        if (viewModel.isLastHistoryPage && historyTasks.isNotEmpty()) {
+                        if (isLastHistoryPage && historyTasks.isNotEmpty()) {
                             item {
                                 Text(
                                     "End of history",

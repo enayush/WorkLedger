@@ -4,13 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,12 +14,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
-import com.sharmarefrigeration.workledger.model.Invoice
-import com.sharmarefrigeration.workledger.model.InvoiceStatus
 import com.sharmarefrigeration.workledger.ui.components.RecentInvoiceCard
 import com.sharmarefrigeration.workledger.ui.components.SwipeRefreshBox
-import java.text.SimpleDateFormat
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +26,7 @@ fun BillingArchiveScreen(
 ) {
     val historyInvoices by viewModel.historyInvoices.collectAsState()
     val isLoading by viewModel.isHistoryLoading.collectAsState()
+    val isLastHistoryPage = viewModel.isLastHistoryPage.collectAsState().value
     val context = LocalContext.current
 
     var isSwipeRefreshing by remember { mutableStateOf(false) }
@@ -131,7 +122,7 @@ fun BillingArchiveScreen(
                             RecentInvoiceCard(invoice = invoice)
 
                             // --- THE INFINITE SCROLL TRIGGER ---
-                            if (index == historyInvoices.lastIndex && !isLoading && !viewModel.isLastHistoryPage) {
+                            if (index == historyInvoices.lastIndex && !isLoading && !isLastHistoryPage) {
                                 LaunchedEffect(key1 = index) {
                                     viewModel.loadHistoryPage(targetUserId = targetUserId)
                                 }
@@ -146,9 +137,14 @@ fun BillingArchiveScreen(
                             }
                         }
 
-                        if (viewModel.isLastHistoryPage && historyInvoices.isNotEmpty()) {
+                        if (isLastHistoryPage && historyInvoices.isNotEmpty()) {
                             item {
-                                Text("End of history", modifier = Modifier.fillMaxWidth().padding(16.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center, style = MaterialTheme.typography.labelSmall)
+                                Text(
+                                    text = "End of history",
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
                             }
                         }
                     }

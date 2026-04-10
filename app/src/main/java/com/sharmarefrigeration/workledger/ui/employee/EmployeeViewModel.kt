@@ -37,7 +37,8 @@ class EmployeeViewModel : ViewModel() {
     val isHistoryLoading: StateFlow<Boolean> = _isHistoryLoading.asStateFlow()
 
     private var lastVisibleHistoryDoc: DocumentSnapshot? = null
-    var isLastHistoryPage = false
+    private val _isLastHistoryPage = MutableStateFlow(false)
+    val isLastHistoryPage: StateFlow<Boolean> = _isLastHistoryPage.asStateFlow()
 
     init {
         listenToDashboard()
@@ -118,11 +119,11 @@ class EmployeeViewModel : ViewModel() {
 
         if (isRefresh) {
             lastVisibleHistoryDoc = null
-            isLastHistoryPage = false
+            _isLastHistoryPage.value = false
             _historyTasks.value = emptyList()
         }
 
-        if (_isHistoryLoading.value || isLastHistoryPage) return
+        if (_isHistoryLoading.value || _isLastHistoryPage.value) return
 
         viewModelScope.launch {
             _isHistoryLoading.value = true
@@ -133,12 +134,12 @@ class EmployeeViewModel : ViewModel() {
             )
 
             if (newTasks.isEmpty()) {
-                isLastHistoryPage = true
+                _isLastHistoryPage.value = true
             } else {
                 _historyTasks.value = _historyTasks.value + newTasks
                 lastVisibleHistoryDoc = lastDoc
 
-                if (newTasks.size < 10) isLastHistoryPage = true
+                if (newTasks.size < 10) _isLastHistoryPage.value = true
             }
 
             _isHistoryLoading.value = false
