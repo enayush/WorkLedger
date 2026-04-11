@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.core.content.edit
+import com.google.firebase.messaging.FirebaseMessaging
 
 sealed class AuthState {
     object Idle : AuthState()
@@ -107,6 +108,18 @@ class AuthViewModel(context: Context) : ViewModel() {
                                 .putString("user_username", userProfile.username)
                                 .putString("user_role", userProfile.role.name)
                                 .putBoolean("user_is_active", userProfile.isActive)
+                        }
+
+                        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                val token = task.result
+                                val uid = auth.currentUser?.uid
+                                if (uid != null) {
+                                    viewModelScope.launch {
+                                        userRepository.updateUserToken(uid, token)
+                                    }
+                                }
+                            }
                         }
 
                         _authState.value = AuthState.Authenticated(userProfile)

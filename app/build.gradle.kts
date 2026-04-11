@@ -43,6 +43,8 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.google.firebase.messaging.ktx)
+    implementation(libs.firebase.messaging)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -72,12 +74,12 @@ dependencies {
     implementation(libs.coil.compose)
 
     implementation(libs.androidx.navigation.compose)
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
-    implementation("androidx.activity:activity-compose:1.8.0")
-    implementation("androidx.navigation:navigation-compose:2.7.4")
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.ui.tooling.preview)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose.v262)
+    implementation(libs.androidx.activity.compose.v180)
+    implementation(libs.androidx.navigation.compose.v274)
 }
 
 kotlin {

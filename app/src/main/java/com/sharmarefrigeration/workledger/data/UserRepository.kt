@@ -71,5 +71,14 @@ class UserRepository {
         }
     }
 
+    suspend fun updateUserToken(uid: String, token: String): Boolean {
+        return try {
+            usersCollection.document(uid).update("fcmToken", token).await()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
 
 }

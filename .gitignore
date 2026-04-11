@@ -17,3 +17,8 @@ captures/
 *.log
 google-services.json
 GoogleService-Info.plist
+
+# Firebase
+firebase-debug.log
+firebase-debug.*.log
+.firebase/

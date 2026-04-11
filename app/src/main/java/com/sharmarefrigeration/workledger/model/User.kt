@@ -12,5 +12,6 @@ data class User(
     val name: String = "",
     val username: String = "",
     val role: UserRole = UserRole.UNKNOWN,
-    val isActive: Boolean = true // Soft delete: Admin can disable users instead of deleting them
+    val isActive: Boolean = true, // Soft delete: Admin can disable users instead of deleting them
+    val fcmToken: String = ""
 )

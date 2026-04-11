@@ -24,6 +24,11 @@ import androidx.lifecycle.ViewModelProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.sharmarefrigeration.workledger.ui.auth.AuthViewModel
 import com.sharmarefrigeration.workledger.ui.auth.LoginScreen
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
 
@@ -45,10 +50,34 @@ class MainActivity : ComponentActivity() {
     private val accountantViewModel: com.sharmarefrigeration.workledger.ui.accountant.AccountantViewModel by viewModels()
     private val adminViewModel: com.sharmarefrigeration.workledger.ui.admin.AdminViewModel by viewModels()
 
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            // Permission granted, FCM will work
+        } else {
+            // Permission denied
+        }
+    }
+
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+                // Already granted
+            } else {
+                // Ask for permission
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         auth = FirebaseAuth.getInstance()
+
+        askNotificationPermission()
 
         setContent {
             MaterialTheme {
