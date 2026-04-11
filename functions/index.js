@@ -58,7 +58,7 @@ exports.notifyOnTaskChange = onDocumentWritten(
               body: `${after.employeeName} finished at ${after.companyName}`,
             },
           };
-          await admin.messaging().sendMulticast(payload);
+          await admin.messaging().sendEachForMulticast(payload);
         }
       }
 
