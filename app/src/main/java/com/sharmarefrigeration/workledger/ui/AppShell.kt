@@ -214,8 +214,16 @@ fun AppShell(
             }
 
             // --- ADMIN ROUTES ---
-            composable("admin_ops") { AdminOperationsScreen(adminViewModel) }
+            composable("admin_ops") { AdminOperationsScreen(adminViewModel, onNavigateToCreateTask = { navController.navigate("admin_create_task") }) }
             composable("admin_approvals") { AdminApprovalsScreen(adminViewModel) }
+
+            composable("admin_create_task") {
+                AdminCreateTaskScreen(
+                    viewModel = adminViewModel,
+                    onBack = { navController.popBackStack() },
+                    onTaskSaved = { navController.popBackStack() }
+                )
+            }
 
             composable("admin_directory") {
                 AdminDirectoryScreen(

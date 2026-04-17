@@ -26,19 +26,18 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AdminOperationsScreen(viewModel: AdminViewModel) {
+fun AdminOperationsScreen(viewModel: AdminViewModel, onNavigateToCreateTask: () -> Unit) {
     val unassignedTasks by viewModel.unassignedTasks.collectAsStateWithLifecycle()
     val assignedTasks by viewModel.assignedTasks.collectAsStateWithLifecycle()
     val employees by viewModel.technicians.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    var showCreateTaskDialog by remember { mutableStateOf(false) }
     var taskToAssign by remember { mutableStateOf<Task?>(null) }
 
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showCreateTaskDialog = true },
+                onClick = onNavigateToCreateTask,
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Create Task")
@@ -82,6 +81,7 @@ fun AdminOperationsScreen(viewModel: AdminViewModel) {
     // --- QUICK ASSIGN DIALOG ---
     taskToAssign?.let { task ->
         var selectedTech by remember { mutableStateOf<User?>(null) }
+        var employeeSearchText by remember { mutableStateOf("") }
         var isAssigning by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { if (!isAssigning) taskToAssign = null },
@@ -90,7 +90,7 @@ fun AdminOperationsScreen(viewModel: AdminViewModel) {
                 Column {
                     Text(task.companyName, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(16.dp))
-                    EmployeeDropdown(employees = employees, selectedUser = selectedTech, onUserSelected = { selectedTech = it })
+                    EmployeeSearchDropdown(employees = employees, selectedUser = selectedTech, searchText = employeeSearchText, onSearchTextChanged = { employeeSearchText = it }, onUserSelected = { selectedTech = it; employeeSearchText = it?.name ?: "" })
                 }
             },
             confirmButton = {
@@ -115,70 +115,33 @@ fun AdminOperationsScreen(viewModel: AdminViewModel) {
             dismissButton = { TextButton(onClick = { taskToAssign = null }, enabled = !isAssigning) { Text("Cancel") } }
         )
     }
-
-    // --- FULL CREATE TASK DIALOG ---
-    if (showCreateTaskDialog) {
-        var companyName by remember { mutableStateOf("") }
-        var address by remember { mutableStateOf("") }
-        var workNeeded by remember { mutableStateOf("") }
-        var selectedTech by remember { mutableStateOf<User?>(null) }
-        val dateString = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date()) }
-
-        var isSubmitting by remember { mutableStateOf(false) }
-
-        AlertDialog(
-            onDismissRequest = { if (!isSubmitting) showCreateTaskDialog = false },
-            title = { Text("Create New Work Order") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = companyName, onValueChange = { companyName = it }, label = { Text("Company Name") }, singleLine = true)
-                    OutlinedTextField(value = address, onValueChange = { address = it }, label = { Text("Address/Location") }, maxLines = 2)
-                    OutlinedTextField(value = workNeeded, onValueChange = { workNeeded = it }, label = { Text("Work Required (Optional)") })
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Assign to (Leave blank to pool):", style = MaterialTheme.typography.labelMedium)
-                    EmployeeDropdown(employees = employees, selectedUser = selectedTech, onUserSelected = { selectedTech = it })
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (isSubmitting) return@Button
-                        isSubmitting = true
-                        viewModel.createNewTask(companyName, address, workNeeded, dateString, selectedTech) {
-                            showCreateTaskDialog = false
-                        }
-                    },
-                    enabled = companyName.isNotBlank() && !isSubmitting
-                ) {
-                    if (isSubmitting) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                    } else {
-                        Text("Create Task")
-                    }
-                }
-            },
-            dismissButton = { TextButton(onClick = { showCreateTaskDialog = false }, enabled = !isSubmitting) { Text("Cancel") } }
-        )
-    }
 }
 
 // --- REUSABLE DROPDOWN COMPONENT ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EmployeeDropdown(employees: List<User>, selectedUser: User?, onUserSelected: (User?) -> Unit) {
+fun EmployeeSearchDropdown(employees: List<User>, selectedUser: User?, searchText: String, onSearchTextChanged: (String) -> Unit, onUserSelected: (User?) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val filteredEmployees = employees.filter { it.name.contains(searchText, ignoreCase = true) }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded }
     ) {
         OutlinedTextField(
-            value = selectedUser?.name ?: "Leave Unassigned",
-            onValueChange = {},
-            readOnly = true,
+            value = searchText,
+            onValueChange = {
+                onSearchTextChanged(it)
+                expanded = true
+                if (selectedUser != null && it != selectedUser.name) {
+                    onUserSelected(null)
+                }
+            },
+            label = { Text(if (selectedUser != null) "Assigned Technician" else "Search Technician...") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.menuAnchor().fillMaxWidth()
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            singleLine = true
         )
         ExposedDropdownMenu(
             expanded = expanded,
@@ -186,12 +149,12 @@ fun EmployeeDropdown(employees: List<User>, selectedUser: User?, onUserSelected:
         ) {
             DropdownMenuItem(
                 text = { Text("Leave Unassigned", color = MaterialTheme.colorScheme.error) },
-                onClick = { onUserSelected(null); expanded = false }
+                onClick = { onUserSelected(null); expanded = false; focusManager.clearFocus() }
             )
-            employees.forEach { tech ->
+            filteredEmployees.forEach { tech ->
                 DropdownMenuItem(
                     text = { Text(tech.name) },
-                    onClick = { onUserSelected(tech); expanded = false }
+                    onClick = { onUserSelected(tech); expanded = false; focusManager.clearFocus() }
                 )
             }
         }

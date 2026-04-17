@@ -34,15 +34,17 @@ fun AdminReportsScreen(viewModel: AdminViewModel, onBack: () -> Unit) {
     val isLoading by viewModel.isReportLoading.collectAsStateWithLifecycle()
 
     var currentMode by remember { mutableStateOf(ReportMode.TASKS) }
-    var showDatePicker by remember { mutableStateOf(false) }
 
-    // Material 3 built-in range picker
-    val dateRangePickerState = rememberDateRangePickerState()
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+
+    val startDateState = rememberDatePickerState()
+    val endDateState = rememberDatePickerState()
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
 
     fun fetchReports() {
-        val start = dateRangePickerState.selectedStartDateMillis
-        val end = dateRangePickerState.selectedEndDateMillis
+        val start = startDateState.selectedDateMillis
+        val end = endDateState.selectedDateMillis
         if (start != null && end != null) {
             if (currentMode == ReportMode.TASKS) {
                 viewModel.searchTasksByDateRange(start, end)
@@ -86,57 +88,30 @@ fun AdminReportsScreen(viewModel: AdminViewModel, onBack: () -> Unit) {
                 )
             }
 
-            // Date Range Selector
-            Surface(
-                onClick = { showDatePicker = true },
+            // Date Range Selectors
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.DateRange,
-                            contentDescription = "Select Date Range",
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Date Range",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-                            )
-                            val start = dateRangePickerState.selectedStartDateMillis
-                            val end = dateRangePickerState.selectedEndDateMillis
-                            if (start != null && end != null) {
-                                val startDateStr = dateFormatter.format(java.util.Date(start))
-                                val endDateStr = dateFormatter.format(java.util.Date(end))
-                                Text(
-                                    text = "$startDateStr - $endDateStr",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            } else {
-                                Text(
-                                    text = "Select dates...",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                        }
-                    }
-                    TextButton(onClick = { showDatePicker = true }) {
-                        Text("Change")
-                    }
-                }
+                // From Date
+                DateSelectionCard(
+                    title = "From",
+                    dateMillis = startDateState.selectedDateMillis,
+                    dateFormatter = dateFormatter,
+                    onClick = { showStartDatePicker = true },
+                    modifier = Modifier.weight(1f)
+                )
+
+                // To Date
+                DateSelectionCard(
+                    title = "To",
+                    dateMillis = endDateState.selectedDateMillis,
+                    dateFormatter = dateFormatter,
+                    onClick = { showEndDatePicker = true },
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             if (isLoading) {
@@ -180,38 +155,93 @@ fun AdminReportsScreen(viewModel: AdminViewModel, onBack: () -> Unit) {
             }
         }
 
-        if (showDatePicker) {
+        if (showStartDatePicker) {
             DatePickerDialog(
-                onDismissRequest = { showDatePicker = false },
+                onDismissRequest = { showStartDatePicker = false },
+                modifier = Modifier.padding(16.dp), // Add margin to prevent edge-to-edge stretching on zoomed screens
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            showDatePicker = false
+                            showStartDatePicker = false
                             fetchReports()
-                        },
-                        enabled = dateRangePickerState.selectedStartDateMillis != null &&
-                                  dateRangePickerState.selectedEndDateMillis != null
-                    ) {
-                        Text("Apply")
-                    }
+                        }
+                    ) { Text("OK") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDatePicker = false }) {
-                        Text("Cancel")
-                    }
+                    TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") }
                 }
             ) {
-                DateRangePicker(
-                    state = dateRangePickerState,
-                    title = {
-                        Text(
-                            text = "Select Date Range",
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    },
-                    headline = null,
-                    showModeToggle = false,
-                    modifier = Modifier.weight(1f)
+                DatePicker(
+                    state = startDateState,
+                    showModeToggle = false // Hiding mode toggle saves some vertical space
+                )
+            }
+        }
+
+        if (showEndDatePicker) {
+            DatePickerDialog(
+                onDismissRequest = { showEndDatePicker = false },
+                modifier = Modifier.padding(16.dp), // Add margin to prevent edge-to-edge stretching on zoomed screens
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showEndDatePicker = false
+                            fetchReports()
+                        }
+                    ) { Text("OK") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") }
+                }
+            ) {
+                DatePicker(
+                    state = endDateState,
+                    showModeToggle = false // Hiding mode toggle saves some vertical space
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DateSelectionCard(
+    title: String,
+    dateMillis: Long?,
+    dateFormatter: SimpleDateFormat,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.DateRange,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (dateMillis != null) dateFormatter.format(java.util.Date(dateMillis)) else "Select",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
