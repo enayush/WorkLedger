@@ -8,6 +8,7 @@ import com.sharmarefrigeration.workledger.data.TaskRepository
 import com.sharmarefrigeration.workledger.model.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlin.printStackTrace
 
 class AccountantViewModel : ViewModel() {
     private val taskRepository = TaskRepository()
@@ -30,11 +31,14 @@ class AccountantViewModel : ViewModel() {
 
     // PIPELINE BUCKETS
     val tasksNeedingBills: StateFlow<List<Task>> = taskRepository.listenToPendingBillingTasks()
+        .catch { it.printStackTrace() } // Prevent crash on logout
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val activeInvoices: StateFlow<List<Invoice>> = (auth.currentUser?.uid?.let { uid ->
         invoiceRepository.listenToRecentInvoices(uid)
-    } ?: emptyFlow()).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    } ?: emptyFlow())
+        .catch { it.printStackTrace() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val invoicesToDistribute: StateFlow<List<Invoice>> = activeInvoices.map { list ->
         list.filter { it.status == InvoiceStatus.CREATED }

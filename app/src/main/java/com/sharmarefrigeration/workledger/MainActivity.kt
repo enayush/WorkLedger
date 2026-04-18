@@ -106,14 +106,12 @@ class MainActivity : ComponentActivity() {
                                 auth.signOut()
                                 authViewModel.clearCache()
 
-                                // 2. Prepare the clean restart intent
                                 val restartIntent = android.content.Intent(this@MainActivity, MainActivity::class.java)
                                 restartIntent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
 
-                                // 3. Restart the Activity
-                                finish()
                                 startActivity(restartIntent)
-                                // 4. Disable the default screen transition animation for a seamless wipe
+                                finish()
+
                                 @Suppress("DEPRECATION")
                                 this@MainActivity.overridePendingTransition(0, 0)
                             }

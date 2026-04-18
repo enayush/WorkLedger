@@ -13,6 +13,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Date
+import kotlin.printStackTrace
 
 class AdminViewModel : ViewModel() {
     private val invoiceRepository = InvoiceRepository()
@@ -25,6 +26,7 @@ class AdminViewModel : ViewModel() {
 
     // --- PIPELINE 1: OPERATIONS (Tasks) ---
     private val activeTasks: StateFlow<List<Task>> = taskRepository.listenToActiveTasksForAdmin()
+        .catch { it.printStackTrace() } // Prevent crash on logout
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val unassignedTasks: StateFlow<List<Task>> = activeTasks.map { list ->
@@ -37,6 +39,7 @@ class AdminViewModel : ViewModel() {
 
     // --- PIPELINE 2: APPROVALS (Invoices) ---
     val pendingInvoices: StateFlow<List<Invoice>> = invoiceRepository.listenToPendingInvoices()
+        .catch { it.printStackTrace() } // Prevent crash on logout
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _technicians = MutableStateFlow<List<User>>(emptyList())
