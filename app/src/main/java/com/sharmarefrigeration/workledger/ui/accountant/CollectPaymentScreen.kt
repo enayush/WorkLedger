@@ -12,33 +12,35 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.Invoice
+import com.sharmarefrigeration.workledger.model.InvoiceStatus
 import com.sharmarefrigeration.workledger.model.PaymentMethod
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.let
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CollectPaymentScreen(viewModel: AccountantViewModel) {
-    val invoices by viewModel.invoicesToCollect.collectAsStateWithLifecycle()
+fun CollectPaymentScreen(viewModel: AccountantViewModel, onNavigateBack: () -> Unit) {
+    val invoicesToCollect by viewModel.invoicesToCollect.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
     var invoiceToPay by remember { mutableStateOf<Invoice?>(null) }
     val dateFormatter = remember { SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()) }
 
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Awaiting Payment", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
 
-        if (invoices.isEmpty()) {
+        if (invoicesToCollect.isEmpty()) {
             item { Text("No payments pending collection.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else {
-            items(invoices, key = { it.id }) { invoice ->
+            items(invoicesToCollect, key = { it.id }) { invoice ->
                 Card(
                     onClick = { invoiceToPay = invoice },
                     modifier = Modifier.fillMaxWidth(),
@@ -156,6 +158,15 @@ fun CollectPaymentScreen(viewModel: AccountantViewModel) {
         }
     }
 
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() },
+            onConfirm = { onNavigateBack() }
+        )
+    }
+
+    // --- DIALOG ---
     invoiceToPay?.let { invoice ->
         var method by remember { mutableStateOf(PaymentMethod.CASH) }
         var refNote by remember { mutableStateOf("") }

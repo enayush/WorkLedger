@@ -114,15 +114,6 @@ class InvoiceRepository {
         } catch (e: Exception) { false }
     }
 
-    suspend fun markInvoiceApproved(invoiceId: String): Boolean {
-        return try {
-            invoiceCollection.document(invoiceId).update(
-                "status", InvoiceStatus.APPROVED.name,
-                "approvedAt", java.util.Date()
-            ).await()
-            true
-        } catch (e: Exception) { false }
-    }
 
     suspend fun markInvoiceApprovedAndUpdateTask(invoiceId: String, taskId: String): Boolean {
         return try {

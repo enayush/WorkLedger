@@ -17,9 +17,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.Task
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 import com.sharmarefrigeration.workledger.ui.components.SwipeRefreshBox
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +31,7 @@ fun AdminTaskManagementScreen(
     val unassignedTasks by viewModel.manageUnassignedTasks.collectAsStateWithLifecycle()
     val assignedTasks by viewModel.manageAssignedTasks.collectAsStateWithLifecycle()
     val isLoading by viewModel.isManageTasksLoading.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var isSwipeRefreshing by remember { mutableStateOf(false) }
@@ -176,6 +177,13 @@ fun AdminTaskManagementScreen(
             dismissButton = {
                 TextButton(onClick = { taskToDelete = null }, enabled = !isLoading) { Text("Cancel") }
             }
+        )
+    }
+
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() }
         )
     }
 }

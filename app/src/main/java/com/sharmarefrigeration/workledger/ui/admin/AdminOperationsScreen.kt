@@ -23,6 +23,7 @@ import com.sharmarefrigeration.workledger.model.User
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +31,7 @@ fun AdminOperationsScreen(viewModel: AdminViewModel, onNavigateToCreateTask: () 
     val unassignedTasks by viewModel.unassignedTasks.collectAsStateWithLifecycle()
     val assignedTasks by viewModel.assignedTasks.collectAsStateWithLifecycle()
     val employees by viewModel.technicians.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var taskToAssign by remember { mutableStateOf<Task?>(null) }
@@ -66,19 +68,29 @@ fun AdminOperationsScreen(viewModel: AdminViewModel, onNavigateToCreateTask: () 
 
             // --- TODAY'S ACTIVE ROSTER ---
             item {
-                Text("Active Roster", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Today's Roster (${assignedTasks.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
-            if (assignedTasks.isEmpty()) {
-                item { Text("No technicians currently working on assigned tasks.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+
+            if (assignedTasks.isEmpty() && unassignedTasks.isEmpty()) {
+                item {
+                    Text("No tasks active.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             } else {
                 items(assignedTasks, key = { it.id }) { task ->
-                    AdminAssignedTaskCard(task = task)
+                    AssignedTaskCard(task = task)
                 }
             }
         }
     }
 
-    // --- QUICK ASSIGN DIALOG ---
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() }
+        )
+    }
+
+    // --- QUICK ASSIGNMENT DIALOG ---
     taskToAssign?.let { task ->
         var selectedTech by remember { mutableStateOf<User?>(null) }
         var employeeSearchText by remember { mutableStateOf("") }
@@ -223,7 +235,7 @@ fun UnassignedTaskCard(task: Task, onClick: () -> Unit) {
 }
 
 @Composable
-fun AdminAssignedTaskCard(task: Task) {
+fun AssignedTaskCard(task: Task) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),

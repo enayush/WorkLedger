@@ -15,28 +15,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.Invoice
+import com.sharmarefrigeration.workledger.model.InvoiceStatus
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DistributeBillScreen(viewModel: AccountantViewModel) {
-    val invoices by viewModel.invoicesToDistribute.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+fun DistributeBillScreen(viewModel: AccountantViewModel, onNavigateBack: () -> Unit) {
+    val invoicesToDistribute by viewModel.invoicesToDistribute.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
     val dateFormatter = remember { SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()) }
 
-    var showDialog by remember { mutableStateOf<Invoice?>(null) }
+    var invoiceToDistribute by remember { mutableStateOf<Invoice?>(null) }
     var distributedToPerson by remember { mutableStateOf("") }
     var distributedAddress by remember { mutableStateOf("") }
 
-    if (showDialog != null) {
-        val invoice = showDialog!!
+    if (invoiceToDistribute != null) {
+        val invoice = invoiceToDistribute!!
         AlertDialog(
-            onDismissRequest = { showDialog = null },
+            onDismissRequest = { invoiceToDistribute = null },
             title = { Text("Distribute Bill") },
             text = {
                 Column {
@@ -64,7 +65,7 @@ fun DistributeBillScreen(viewModel: AccountantViewModel) {
                             invoiceId = invoice.id,
                             personName = distributedToPerson,
                             address = distributedAddress,
-                            onSuccess = { showDialog = null }
+                            onSuccess = { invoiceToDistribute = null }
                         )
                     },
                     enabled = distributedToPerson.isNotBlank() && distributedAddress.isNotBlank()
@@ -73,19 +74,27 @@ fun DistributeBillScreen(viewModel: AccountantViewModel) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDialog = null }) {
+                TextButton(onClick = { invoiceToDistribute = null }) {
                     Text("Cancel")
                 }
             }
         )
     }
 
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() },
+            onConfirm = { onNavigateBack() }
+        )
+    }
+
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Ready to Send", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        if (invoices.isEmpty()) {
+        if (invoicesToDistribute.isEmpty()) {
             item { Text("No bills waiting to be sent.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else {
-            items(invoices, key = { it.id }) { invoice ->
+            items(invoicesToDistribute, key = { it.id }) { invoice ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -196,7 +205,7 @@ fun DistributeBillScreen(viewModel: AccountantViewModel) {
                             onClick = {
                                 distributedToPerson = ""
                                 distributedAddress = ""
-                                showDialog = invoice
+                                invoiceToDistribute = invoice
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.medium

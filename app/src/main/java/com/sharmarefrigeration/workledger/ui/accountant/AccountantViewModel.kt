@@ -18,6 +18,13 @@ class AccountantViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _errorEvent = MutableStateFlow<String?>(null)
+    val errorEvent: StateFlow<String?> = _errorEvent.asStateFlow()
+
+    fun clearError() {
+        _errorEvent.value = null
+    }
+
     private val _historyInvoices = MutableStateFlow<List<Invoice>>(emptyList())
     val historyInvoices: StateFlow<List<Invoice>> = _historyInvoices.asStateFlow()
 
@@ -31,13 +38,19 @@ class AccountantViewModel : ViewModel() {
 
     // PIPELINE BUCKETS
     val tasksNeedingBills: StateFlow<List<Task>> = taskRepository.listenToPendingBillingTasks()
-        .catch { it.printStackTrace() } // Prevent crash on logout
+        .catch { e ->
+            _errorEvent.value = "Failed to load pending bills: ${e.message ?: "Network error"}"
+            e.printStackTrace()
+        } // Prevent crash on logout
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val activeInvoices: StateFlow<List<Invoice>> = (auth.currentUser?.uid?.let { uid ->
         invoiceRepository.listenToRecentInvoices(uid)
     } ?: emptyFlow())
-        .catch { it.printStackTrace() }
+        .catch { e ->
+            _errorEvent.value = "Failed to load active invoices: ${e.message ?: "Network error"}"
+            e.printStackTrace()
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val invoicesToDistribute: StateFlow<List<Invoice>> = activeInvoices.map { list ->
@@ -67,6 +80,8 @@ class AccountantViewModel : ViewModel() {
 
             if (invoiceRepository.createInvoiceAndUpdateTask(newInvoice, TaskStatus.PENDING_APPROVAL)) {
                 onSuccess()
+            } else {
+                _errorEvent.value = "Failed to generate bill."
             }
             _isLoading.value = false
         }
@@ -76,10 +91,12 @@ class AccountantViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
 
-            // Note: You will need to update your InvoiceRepository to accept these extra strings!
-            invoiceRepository.updateInvoiceDistribution(invoiceId, InvoiceStatus.DISTRIBUTED, personName, address)
-
-            onSuccess()
+            try {
+                invoiceRepository.updateInvoiceDistribution(invoiceId, InvoiceStatus.DISTRIBUTED, personName, address)
+                onSuccess()
+            } catch (e: Exception) {
+                _errorEvent.value = e.message ?: "Failed to mark as distributed."
+            }
             _isLoading.value = false
         }
     }
@@ -87,8 +104,12 @@ class AccountantViewModel : ViewModel() {
     fun confirmPayment(invoiceId: String, method: PaymentMethod, referenceNote: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             _isLoading.value = true
-            invoiceRepository.updatePaymentDetails(invoiceId, method, referenceNote)
-            onSuccess()
+            try {
+                invoiceRepository.updatePaymentDetails(invoiceId, method, referenceNote)
+                onSuccess()
+            } catch (e: Exception) {
+                _errorEvent.value = e.message ?: "Failed to confirm payment."
+            }
             _isLoading.value = false
         }
     }

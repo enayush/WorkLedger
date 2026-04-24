@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 import java.text.SimpleDateFormat
 import java.util.Locale
 import com.sharmarefrigeration.workledger.ui.components.RecentInvoiceCard
@@ -28,10 +28,11 @@ enum class ReportMode { TASKS, INVOICES }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AdminReportsScreen(viewModel: AdminViewModel, onBack: () -> Unit) {
+fun AdminReportsScreen(viewModel: AdminViewModel, onNavigateBack: () -> Unit) {
     val reportTasks by viewModel.reportTasks.collectAsStateWithLifecycle()
     val reportInvoices by viewModel.reportInvoices.collectAsStateWithLifecycle()
     val isLoading by viewModel.isReportLoading.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
 
     var currentMode by remember { mutableStateOf(ReportMode.TASKS) }
 
@@ -63,7 +64,7 @@ fun AdminReportsScreen(viewModel: AdminViewModel, onBack: () -> Unit) {
             TopAppBar(
                 title = { Text("Tasks & Invoices") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -200,6 +201,13 @@ fun AdminReportsScreen(viewModel: AdminViewModel, onBack: () -> Unit) {
                 )
             }
         }
+    }
+
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() }
+        )
     }
 }
 

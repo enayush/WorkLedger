@@ -18,11 +18,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.Invoice
 import com.sharmarefrigeration.workledger.model.InvoiceStatus
 import com.sharmarefrigeration.workledger.model.PaymentMethod
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 import kotlin.let
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,6 +30,7 @@ import kotlin.let
 fun AdminApprovalsScreen(viewModel: AdminViewModel) {
     val pendingInvoices by viewModel.pendingInvoices.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var selectedInvoice by remember { mutableStateOf<Invoice?>(null) }
@@ -53,6 +54,13 @@ fun AdminApprovalsScreen(viewModel: AdminViewModel) {
                 )
             }
         }
+    }
+
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() }
+        )
     }
 
     // --- THE UNIFIED ADMIN INVOICE DIALOG ---
@@ -108,7 +116,7 @@ fun AdminApprovalsScreen(viewModel: AdminViewModel) {
                         Text("Bypass the accountant and record this payment directly.", style = MaterialTheme.typography.bodySmall)
 
                         Text("Select Payment Method:")
-                        PaymentMethod.values().filter { it != PaymentMethod.PENDING }.forEach { m ->
+                        PaymentMethod.entries.filter { it != PaymentMethod.PENDING }.forEach { m ->
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                                 RadioButton(selected = method == m, onClick = { method = m })
                                 Spacer(modifier = Modifier.width(8.dp))

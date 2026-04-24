@@ -23,6 +23,13 @@ class EmployeeViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _errorEvent = MutableStateFlow<String?>(null)
+    val errorEvent: StateFlow<String?> = _errorEvent.asStateFlow()
+
+    fun clearError() {
+        _errorEvent.value = null
+    }
+
     // Replacing manual collect with stateIn
     val assignedTasks: StateFlow<List<Task>> = if (uid != null) {
         taskRepository.listenToAssignedTasksForEmployee(uid)
@@ -30,6 +37,7 @@ class EmployeeViewModel : ViewModel() {
             .onEach { _isLoading.value = false }
             .catch { e ->
                 _isLoading.value = false
+                _errorEvent.value = "Failed to load tasks: ${e.message ?: "Network error"}"
                 e.printStackTrace()
             }
             .stateIn(
@@ -41,7 +49,10 @@ class EmployeeViewModel : ViewModel() {
 
     val submittedTasks: StateFlow<List<Task>> = if (uid != null) {
         taskRepository.listenToRecentSubmittedTasks(uid)
-            .catch { it.printStackTrace() }
+            .catch { e ->
+                _errorEvent.value = "Failed to load submitted tasks: ${e.message ?: "Network error"}"
+                e.printStackTrace()
+            }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
@@ -74,6 +85,7 @@ class EmployeeViewModel : ViewModel() {
     ) {
         val uid = auth.currentUser?.uid
         if (uid == null) {
+            _errorEvent.value = "User not logged in"
             onError("User not logged in")
             return
         }
@@ -101,6 +113,7 @@ class EmployeeViewModel : ViewModel() {
             if (success) {
                 onSuccess()
             } else {
+                _errorEvent.value = "Failed to save task details."
                 onError("Failed to save task details.")
             }
         }
@@ -161,6 +174,7 @@ class EmployeeViewModel : ViewModel() {
             if (success) {
                 onSuccess()
             } else {
+                _errorEvent.value = "Failed to submit work."
                 onError("Failed to submit work.")
             }
         }

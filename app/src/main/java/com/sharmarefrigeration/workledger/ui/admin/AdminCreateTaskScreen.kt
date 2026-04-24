@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.User
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -37,6 +38,7 @@ fun AdminCreateTaskScreen(
     val scrollState = rememberScrollState()
 
     val employees by viewModel.technicians.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
 
     // Form State
     var companyName by remember { mutableStateOf("") }
@@ -245,7 +247,11 @@ fun AdminCreateTaskScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() }
+        )
+    }
 }
-
-
-

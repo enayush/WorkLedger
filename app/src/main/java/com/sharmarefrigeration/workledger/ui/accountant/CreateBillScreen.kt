@@ -11,31 +11,33 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.Task
+import com.sharmarefrigeration.workledger.model.TaskType
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateBillScreen(viewModel: AccountantViewModel) {
-    val pendingTasks by viewModel.tasksNeedingBills.collectAsStateWithLifecycle()
+fun CreateBillScreen(viewModel: AccountantViewModel, onNavigateBack: () -> Unit) {
+    val tasksNeedingBills by viewModel.tasksNeedingBills.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var taskToProcess by remember { mutableStateOf<Task?>(null) }
+    var taskToBill by remember { mutableStateOf<Task?>(null) }
 
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Ready for Billing", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        if (pendingTasks.isEmpty() && !isLoading) {
+        if (tasksNeedingBills.isEmpty() && !isLoading) {
             item { Text("All technicians are caught up.") }
         } else {
-            items(pendingTasks) { task ->
+            items(tasksNeedingBills) { task ->
                 Card(
-                    onClick = { taskToProcess = task },
+                    onClick = { taskToBill = task },
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -127,12 +129,20 @@ fun CreateBillScreen(viewModel: AccountantViewModel) {
         }
     }
 
-    // Processing Dialog
-    taskToProcess?.let { task ->
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() },
+            onConfirm = { onNavigateBack() }
+        )
+    }
+
+    // --- POPUP DIALOGS ---
+    taskToBill?.let { task ->
         var amountText by remember { mutableStateOf("") }
         var notes by remember { mutableStateOf("") }
         AlertDialog(
-            onDismissRequest = { taskToProcess = null },
+            onDismissRequest = { taskToBill = null },
             title = { Text("Generate Bill", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineSmall) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -184,13 +194,13 @@ fun CreateBillScreen(viewModel: AccountantViewModel) {
             },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.generateBill(task, amountText.toDoubleOrNull() ?: 0.0, notes) { taskToProcess = null } },
+                    onClick = { viewModel.generateBill(task, amountText.toDoubleOrNull() ?: 0.0, notes) { taskToBill = null } },
                     enabled = amountText.isNotBlank(),
                     shape = MaterialTheme.shapes.medium
                 ) { Text("Generate Bill") }
             },
             dismissButton = {
-                TextButton(onClick = { taskToProcess = null }) { Text("Cancel") }
+                TextButton(onClick = { taskToBill = null }) { Text("Cancel") }
             }
         )
     }

@@ -24,9 +24,19 @@ class AdminViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _errorEvent = MutableStateFlow<String?>(null)
+    val errorEvent: StateFlow<String?> = _errorEvent.asStateFlow()
+
+    fun clearError() {
+        _errorEvent.value = null
+    }
+
     // --- PIPELINE 1: OPERATIONS (Tasks) ---
     private val activeTasks: StateFlow<List<Task>> = taskRepository.listenToActiveTasksForAdmin()
-        .catch { it.printStackTrace() } // Prevent crash on logout
+        .catch { e ->
+            _errorEvent.value = "Failed to load active tasks: ${e.message ?: "Network error"}"
+            e.printStackTrace()
+        } // Prevent crash on logout
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val unassignedTasks: StateFlow<List<Task>> = activeTasks.map { list ->
@@ -39,7 +49,10 @@ class AdminViewModel : ViewModel() {
 
     // --- PIPELINE 2: APPROVALS (Invoices) ---
     val pendingInvoices: StateFlow<List<Invoice>> = invoiceRepository.listenToPendingInvoices()
-        .catch { it.printStackTrace() } // Prevent crash on logout
+        .catch { e ->
+            _errorEvent.value = "Failed to load pending invoices: ${e.message ?: "Network error"}"
+            e.printStackTrace()
+        } // Prevent crash on logout
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _technicians = MutableStateFlow<List<User>>(emptyList())
@@ -87,6 +100,8 @@ class AdminViewModel : ViewModel() {
 
             if (taskRepository.saveTask(newTask)) {
                 onSuccess()
+            } else {
+                _errorEvent.value = "Failed to create task."
             }
             _isLoading.value = false
         }
@@ -108,7 +123,10 @@ class AdminViewModel : ViewModel() {
             _isLoading.value = true
             if (invoiceRepository.markInvoiceApprovedAndUpdateTask(invoice.id, invoice.taskId)) {
                 onSuccess()
-            } else onError("Failed to approve invoice and update task.")
+            } else {
+                _errorEvent.value = "Failed to approve invoice and update task."
+                onError("Failed to approve invoice and update task.")
+            }
             _isLoading.value = false
         }
     }
@@ -126,7 +144,10 @@ class AdminViewModel : ViewModel() {
             // 1. Force the Invoice Closed && 2. Close the original Task atomically
             if (invoiceRepository.adminForceApprovePaymentAndUpdateTask(invoice.id, invoice.taskId, method, notes)) {
                 onSuccess()
-            } else onError("Failed to force approve invoice and close task.")
+            } else {
+                _errorEvent.value = "Failed to force approve invoice and close task."
+                onError("Failed to force approve invoice and close task.")
+            }
 
             _isLoading.value = false
         }
@@ -157,11 +178,13 @@ class AdminViewModel : ViewModel() {
 
             if (existingPhone != null) {
                 _isLoading.value = false
+                _errorEvent.value = "This phone number is already registered."
                 onError("This phone number is already registered.")
                 return@launch
             }
             if (existingUsername != null) {
                 _isLoading.value = false
+                _errorEvent.value = "Username '$cleanUsername' is already taken."
                 onError("Username '$cleanUsername' is already taken.")
                 return@launch
             }
@@ -197,6 +220,7 @@ class AdminViewModel : ViewModel() {
 
             } catch (e: Exception) {
                 e.printStackTrace()
+                _errorEvent.value = e.localizedMessage ?: "Failed to create account."
                 onError(e.localizedMessage ?: "Failed to create account.")
             }
             _isLoading.value = false
@@ -235,6 +259,7 @@ class AdminViewModel : ViewModel() {
                 onSuccess()
             } else {
                 _isManageTasksLoading.value = false
+                _errorEvent.value = "Failed to delete task."
                 onError()
             }
         }

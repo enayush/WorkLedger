@@ -1,9 +1,7 @@
 package com.sharmarefrigeration.workledger.ui
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.FactCheck
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -39,9 +37,7 @@ fun AppShell(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val context = LocalContext.current
 
-    val isEmployeeLoading by employeeViewModel.isLoading.collectAsStateWithLifecycle()
 
     // Determine the start destination based on role
     val startDest = when (currentUser.role) {
@@ -273,7 +269,7 @@ fun AppShell(
             composable("admin_reports") {
                 AdminReportsScreen(
                     viewModel = adminViewModel,
-                    onBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable("admin_add_user") {
@@ -284,10 +280,10 @@ fun AppShell(
             }
 
             // --- ACCOUNTANT ROUTES ---
-            composable("acc_create") { CreateBillScreen(accountantViewModel) }
-            composable("acc_distribute") { DistributeBillScreen(accountantViewModel) }
-            composable("acc_collect") { CollectPaymentScreen(accountantViewModel) }
-            composable("accountant_history") { BillingArchiveScreen(accountantViewModel, onBack = { navController.popBackStack() }) }
+            composable("acc_create") { CreateBillScreen(accountantViewModel, onNavigateBack = { navController.popBackStack() }) }
+            composable("acc_distribute") { DistributeBillScreen(accountantViewModel, onNavigateBack = { navController.popBackStack() }) }
+            composable("acc_collect") { CollectPaymentScreen(accountantViewModel, onNavigateBack = { navController.popBackStack() }) }
+            composable("accountant_history") { BillingArchiveScreen(accountantViewModel, targetUserId = null, onBack = { navController.popBackStack() }) }
 
             // --- EMPLOYEE ROUTES ---
             composable("dashboard") {
@@ -316,7 +312,7 @@ fun AppShell(
                     onTaskSaved = { navController.popBackStack() }
                 )
             }
-            composable("employee_history") { WorkLedgerScreen(employeeViewModel, onBack = { navController.popBackStack() }) }
+            composable("employee_history") { WorkLedgerScreen(employeeViewModel, targetUserId = null, onBack = { navController.popBackStack() }) }
         }
     }
 }

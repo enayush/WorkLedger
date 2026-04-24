@@ -1,6 +1,5 @@
 package com.sharmarefrigeration.workledger.ui.admin
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,16 +9,14 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sharmarefrigeration.workledger.model.User
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 
 @Composable
 fun AdminDirectoryScreen(
@@ -29,11 +26,12 @@ fun AdminDirectoryScreen(
 ) {
     val technicians by viewModel.technicians.collectAsStateWithLifecycle()
     val accountants by viewModel.accountants.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize() // Good practice to have it fill max size
     ) {
         item {
             Text("Team Directory", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -51,7 +49,6 @@ fun AdminDirectoryScreen(
                 UserDirectoryCard(
                     user = user,
                     isAccountant = true,
-                    // Use the accountant callback!
                     onClick = { onAccountantClick(user.id) }
                 )
             }
@@ -71,14 +68,21 @@ fun AdminDirectoryScreen(
                 UserDirectoryCard(
                     user = user,
                     isAccountant = false,
-                    // Use the technician callback!
                     onClick = { onTechnicianClick(user.id) }
                 )
             }
         }
     }
+
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() }
+        )
+    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserDirectoryCard(user: User, isAccountant: Boolean, onClick: () -> Unit) {
     Card(

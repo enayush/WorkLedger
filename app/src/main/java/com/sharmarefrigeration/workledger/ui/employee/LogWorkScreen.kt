@@ -15,15 +15,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.scale
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import com.sharmarefrigeration.workledger.model.TaskType
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.ui.draw.scale
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LogWorkScreen(
     viewModel: EmployeeViewModel,
@@ -36,7 +38,9 @@ fun LogWorkScreen(
     val focusManager = LocalFocusManager.current
     val scrollState = rememberScrollState()
 
-    // Form State
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
+
     var companyName by remember { mutableStateOf("") }
     var companyAddress by remember { mutableStateOf("") }
     var workDone by remember { mutableStateOf("") }
@@ -48,10 +52,6 @@ fun LogWorkScreen(
 
     var isSubmitting by remember { mutableStateOf(false) }
     var isSuccess by remember { mutableStateOf(false) }
-
-    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-
-    var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(taskIdToComplete) {
         if (taskIdToComplete != null) {
@@ -69,9 +69,9 @@ fun LogWorkScreen(
         SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date())
     }
 
-    BackHandler(enabled = isLoading) {
-        Toast.makeText(context, "Please wait, saving job details...", Toast.LENGTH_SHORT).show()
-    }
+//    BackHandler(enabled = isLoading) {
+//        Toast.makeText(context, "Please wait, saving job details...", Toast.LENGTH_SHORT).show()
+//    }
 
     Scaffold(
         bottomBar = {
@@ -153,11 +153,10 @@ fun LogWorkScreen(
             ) {
                 IconButton(
                     onClick = {
-                        if (isLoading) {
-                            Toast.makeText(context, "Please wait, saving job details...", Toast.LENGTH_SHORT).show()
-                        } else {
-                            onBack()
-                        }
+//                        if (isLoading) {
+//                            Toast.makeText(context, "Please wait, saving job details...", Toast.LENGTH_SHORT).show()
+//                        } else {
+                        onBack()
                     }
                 ) {
                     Icon(
@@ -306,5 +305,13 @@ fun LogWorkScreen(
             }
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() },
+            onConfirm = { onBack() }
+        )
     }
 }

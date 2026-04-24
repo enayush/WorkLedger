@@ -19,15 +19,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 
 @Composable
 fun LoginScreen(viewModel: AuthViewModel) {
     val authState by viewModel.authState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
     var username by remember { mutableStateOf("") }
@@ -96,16 +94,13 @@ fun LoginScreen(viewModel: AuthViewModel) {
                     Text("Login")
                 }
             }
-
-            if (authState is AuthState.Error) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = (authState as AuthState.Error).message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center
-                )
-            }
         }
+    }
+
+    if (authState is AuthState.Error) {
+        ErrorDialog(
+            errorMessage = (authState as AuthState.Error).message,
+            onDismiss = { viewModel.setIdle() }
+        )
     }
 }

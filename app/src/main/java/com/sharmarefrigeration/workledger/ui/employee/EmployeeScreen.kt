@@ -19,6 +19,7 @@ import com.sharmarefrigeration.workledger.model.Task
 import com.sharmarefrigeration.workledger.model.TaskType
 import com.sharmarefrigeration.workledger.ui.components.SubmittedTaskCard
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +33,7 @@ fun EmployeeScreen(
     val assignedTasks by viewModel.assignedTasks.collectAsStateWithLifecycle()
     val submittedTasks by viewModel.submittedTasks.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
 
     // State to handle viewing a submitted task details
     var taskToView by remember { mutableStateOf<Task?>(null) }
@@ -103,6 +105,13 @@ fun EmployeeScreen(
         ViewSubmittedTaskDialog(
             task = task,
             onDismiss = { taskToView = null }
+        )
+    }
+
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() }
         )
     }
 }

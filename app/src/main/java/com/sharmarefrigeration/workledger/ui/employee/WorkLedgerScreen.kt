@@ -7,16 +7,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import android.widget.Toast
-import com.sharmarefrigeration.workledger.ui.components.SubmittedTaskCard
-import com.sharmarefrigeration.workledger.model.Task
-import com.sharmarefrigeration.workledger.ui.components.SwipeRefreshBox
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sharmarefrigeration.workledger.model.Task
+import com.sharmarefrigeration.workledger.ui.components.SubmittedTaskCard
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
+import com.sharmarefrigeration.workledger.ui.components.SwipeRefreshBox
+import android.widget.Toast
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,11 +26,12 @@ fun WorkLedgerScreen(
     targetUserId: String? = null,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val historyTasks by viewModel.historyTasks.collectAsStateWithLifecycle()
     val isLoading by viewModel.isHistoryLoading.collectAsStateWithLifecycle()
     val isLastHistoryPage by viewModel.isLastHistoryPage.collectAsStateWithLifecycle()
-    val context = LocalContext.current
 
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
     var isSwipeRefreshing by remember { mutableStateOf(false) }
 
     LaunchedEffect(isLoading) {
@@ -155,6 +157,12 @@ fun WorkLedgerScreen(
         }
     }
 
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() }
+        )
+    }
     taskToView?.let { task ->
         ViewSubmittedTaskDialog(task = task, onDismiss = { taskToView = null })
     }

@@ -10,15 +10,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.sharmarefrigeration.workledger.model.Invoice
-import com.sharmarefrigeration.workledger.model.InvoiceStatus
 import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
+import com.sharmarefrigeration.workledger.ui.components.ErrorDialog
 import com.sharmarefrigeration.workledger.ui.components.RecentInvoiceCard
 import com.sharmarefrigeration.workledger.ui.components.SwipeRefreshBox
 
@@ -29,10 +27,11 @@ fun BillingArchiveScreen(
     targetUserId: String? = null,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val historyInvoices by viewModel.historyInvoices.collectAsStateWithLifecycle()
     val isLoading by viewModel.isHistoryLoading.collectAsStateWithLifecycle()
-    val isLastHistoryPage = viewModel.isLastHistoryPage.collectAsStateWithLifecycle().value
-    val context = LocalContext.current
+    val isLastHistoryPage by viewModel.isLastHistoryPage.collectAsStateWithLifecycle()
+    val errorEvent by viewModel.errorEvent.collectAsStateWithLifecycle()
 
     var isSwipeRefreshing by remember { mutableStateOf(false) }
 
@@ -157,4 +156,13 @@ fun BillingArchiveScreen(
             }
         }
     }
+
+    if (errorEvent != null) {
+        ErrorDialog(
+            errorMessage = errorEvent!!,
+            onDismiss = { viewModel.clearError() }
+        )
+    }
+
+    // (If you want a detail view when clicking an invoice, you can adapt ViewSubmittedTaskDialog for invoices here)
 }
